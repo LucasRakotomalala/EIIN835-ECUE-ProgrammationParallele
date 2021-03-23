@@ -11,11 +11,11 @@ struct tablo {
 };
 
 void printTablo(struct tablo *tmp) {
-    printf("[%i] : ", tmp->size);
+    printf("[%i] :", tmp->size);
     int size = tmp->size;
     
     for (int i = 0; i < size; ++i)
-        printf("%ld ", tmp->tab[i]);
+        printf(" %ld", tmp->tab[i]);
     
     printf("\n");
 }
@@ -33,7 +33,7 @@ void freeTablo(struct tablo *tmp) {
     free(tmp);
 }
 
-struct tablo *parseFile(char *filePath) {
+struct tablo *parseFileAndFillTablo(char *filePath) {
     struct tablo *source;
     FILE *file = fopen(filePath, "r");
     
@@ -45,7 +45,7 @@ struct tablo *parseFile(char *filePath) {
     int size = 0;
     long nb = 0;
     
-    // Trouve le nombre d'entier présent dans le fichier
+    // Recherche du nombre d'entier présent dans le fichier pour éviter de faire des realloc
     fscanf(file, "%ld", &nb);
     while (!feof (file)) {
         fscanf(file, "%ld", &nb);
@@ -54,9 +54,10 @@ struct tablo *parseFile(char *filePath) {
         
     source = allocateTablo(size);
     
+    // Retour au début du fichier
     rewind(file);
     
-    // Remplit le tableau
+    // Remplissage du tableau
     fscanf(file, "%ld", &nb);
     for (int i = 0; !feof (file); ++i) {
         source->tab[i] = nb;
@@ -68,7 +69,7 @@ struct tablo *parseFile(char *filePath) {
     return source;
 }
 
-void montee(struct tablo *source, struct tablo *dest) {
+void up(struct tablo *source, struct tablo *dest) {
     // Copie du tableau initial à la fin du nouveau tableau
     #pragma omp parallel for
     for (int i = 0; i < source->size; i++) {
@@ -87,7 +88,7 @@ void montee(struct tablo *source, struct tablo *dest) {
     }
 }
 
-void descente(struct tablo *a, struct tablo *b) {
+void down(struct tablo *a, struct tablo *b) {
     b->tab[1] = 0; // Élément neutre de la somme
     
     int m = (int) log2(a->size / 2);
@@ -107,7 +108,7 @@ void descente(struct tablo *a, struct tablo *b) {
     }
 }
 
-void descenteSuffixe(struct tablo *a, struct tablo *b) {
+void downSuffix(struct tablo *a, struct tablo *b) {
     b->tab[1] = 0;
     
     int m = (int) log2(a->size / 2);
@@ -127,7 +128,7 @@ void descenteSuffixe(struct tablo *a, struct tablo *b) {
     }
 }
 
-void monteeMax(struct tablo *source, struct tablo *dest) {
+void upMax(struct tablo *source, struct tablo *dest) {
     // Copie du tableau initial à la fin du nouveau tableau
     #pragma omp parallel for
     for (int i = 0; i < source->size; i++) {
@@ -146,7 +147,7 @@ void monteeMax(struct tablo *source, struct tablo *dest) {
     }
 }
 
-void descenteMax(struct tablo *a, struct tablo *b) {
+void downMax(struct tablo *a, struct tablo *b) {
     b->tab[1] = LONG_MIN; // Élément neutre du max des entiers long
     
     int m = (int) log2(a->size / 2);
@@ -166,7 +167,7 @@ void descenteMax(struct tablo *a, struct tablo *b) {
     }
 }
 
-void descenteSuffixeMax(struct tablo *a, struct tablo *b) {
+void downMaxSuffix(struct tablo *a, struct tablo *b) {
     b->tab[1] = LONG_MIN; // Élément neutre du max des entiers long
     
     int m = (int) log2(a->size / 2);
@@ -209,11 +210,11 @@ void finalMax(struct tablo *a, struct tablo *b) {
 void prefixSum(struct tablo *source, struct tablo *dest) {
     struct tablo *a = allocateTablo(source->size * 2);
     
-    montee(source, a);
+    up(source, a);
     
     struct tablo *b = allocateTablo(source->size * 2);
     
-    descente(a, b);
+    down(a, b);
     final(a, b);
     
     #pragma omp parallel for
@@ -228,11 +229,11 @@ void prefixSum(struct tablo *source, struct tablo *dest) {
 void suffixSum(struct tablo *source, struct tablo *dest) {
     struct tablo *a = allocateTablo(source->size * 2);
     
-    montee(source, a);
+    up(source, a);
     
     struct tablo *b = allocateTablo(source->size * 2);
     
-    descenteSuffixe(a, b);
+    downSuffix(a, b);
     final(a, b);
     
     #pragma omp parallel for
@@ -247,11 +248,11 @@ void suffixSum(struct tablo *source, struct tablo *dest) {
 void suffixMax(struct tablo *source, struct tablo *dest) {
     struct tablo *a = allocateTablo(source->size * 2);
     
-    monteeMax(source, a);
+    upMax(source, a);
     
     struct tablo *b = allocateTablo(source->size * 2);
     
-    descenteSuffixeMax(a, b);
+    downMaxSuffix(a, b);
     finalMax(a, b);
     
     #pragma omp parallel for
@@ -266,11 +267,11 @@ void suffixMax(struct tablo *source, struct tablo *dest) {
 void prefixMax(struct tablo *source, struct tablo *dest) {
     struct tablo *a = allocateTablo(source->size * 2);
     
-    monteeMax(source, a);
+    upMax(source, a);
     
     struct tablo *b = allocateTablo(source->size * 2);
     
-    descenteMax(a, b);
+    downMax(a, b);
     finalMax(a, b);
     
     #pragma omp parallel for
@@ -311,7 +312,7 @@ void displayResult(struct tablo *M, struct tablo *source) {
 }
 
 int main(int argc, char **argv) {
-    struct tablo *Q = parseFile(argv[1]);
+    struct tablo *Q = parseFileAndFillTablo(argv[1]);
         
     struct tablo *PSUM = allocateTablo(Q->size);
     struct tablo *SSUM = allocateTablo(Q->size);
@@ -331,12 +332,18 @@ int main(int argc, char **argv) {
     
     struct tablo *M = allocateTablo(Q->size);
     
-    #pragma omp parallel for
+    // Étape 5
+    /*#pragma omp parallel for
     for (int i = 0; i < Q->size; i++) {
         long Ms = PMAX->tab[i] - SSUM->tab[i] + Q->tab[i];
         long Mp = SMAX->tab[i] - PSUM->tab[i] + Q->tab[i];
         M->tab[i] = Ms + Mp - Q->tab[i];
-    }
+    }*/
+    
+    // Simplification de l'étape 5
+    #pragma omp parallel for
+     for (int i = 0; i < Q->size; i++)
+         M->tab[i] = PMAX->tab[i] - SSUM->tab[i] + SMAX->tab[i] - PSUM->tab[i] + Q->tab[i];
     
     //printTablo(M);
     
