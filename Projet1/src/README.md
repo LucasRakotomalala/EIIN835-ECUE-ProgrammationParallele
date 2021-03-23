@@ -18,3 +18,9 @@
 * `void prefixMax(struct tablo *source, struct tablo *dest)` : parallele
 * `void displayResult(struct tablo *M, struct tablo *source)` : non parallele
 * `int main(int argc, char **argv)` : parallele
+
+## Compilation du fichier source
+
+```c
+gcc -Wall -std=c99 -o rakotomalala rakotomalala.c -lm -fopenmp
+```
