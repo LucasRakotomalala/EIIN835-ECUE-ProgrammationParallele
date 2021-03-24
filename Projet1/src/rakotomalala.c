@@ -15,7 +15,7 @@ void printTablo(struct tablo *tmp) {
     int size = tmp->size;
     
     for (int i = 0; i < size; ++i)
-        printf(" %ld", tmp->tab[i]);
+    printf(" %ld", tmp->tab[i]);
     
     printf("\n");
 }
@@ -45,13 +45,13 @@ struct tablo *parseFileAndFillTablo(char *filePath) {
     int size = 0;
     long nb = 0;
     
-    // Recherche du nombre d'entier présent dans le fichier pour éviter de faire des realloc
+    // Recherche du nombre d'entiers (long) présent dans le fichier pour éviter de faire des realloc
     fscanf(file, "%ld", &nb);
     while (!feof (file)) {
         fscanf(file, "%ld", &nb);
-        size += 1;
+        size++;
     }
-        
+    
     source = allocateTablo(size);
     
     // Retour au début du fichier
@@ -63,7 +63,7 @@ struct tablo *parseFileAndFillTablo(char *filePath) {
         source->tab[i] = nb;
         fscanf(file, "%ld", &nb);
     }
-        
+    
     fclose(file);
     
     return source;
@@ -87,7 +87,7 @@ void up(struct tablo *source, struct tablo *dest) {
 
 void down(struct tablo *a, struct tablo *b) {
     b->tab[1] = 0; // Élément neutre de la somme
-        
+    
     // Algorithme de descente préfixe
     for (int i = 1; i <= log2(a->size / 2); i++) {
         
@@ -135,7 +135,7 @@ void upMax(struct tablo *source, struct tablo *dest) {
 
 void downMax(struct tablo *a, struct tablo *b) {
     b->tab[1] = LONG_MIN; // Élément neutre du max des entiers long
-        
+    
     // Algorithme de descente préfixe max
     for (int i = 1; i <= log2(a->size / 2); i++) {
         #pragma omp parallel for
@@ -287,37 +287,30 @@ void displayResult(struct tablo *M, struct tablo *source) {
 
 int main(int argc, char **argv) {
     struct tablo *Q = parseFileAndFillTablo(argv[1]);
-        
+    
     struct tablo *PSUM = allocateTablo(Q->size);
     struct tablo *SSUM = allocateTablo(Q->size);
     struct tablo *SMAX = allocateTablo(Q->size);
     struct tablo *PMAX = allocateTablo(Q->size);
-
+    
     prefixSum(Q, PSUM);
     suffixSum(Q, SSUM);
     suffixMax(PSUM, SMAX);
     prefixMax(SSUM, PMAX);
     
     /*printTablo(Q);
-    printTablo(PSUM);
-    printTablo(SSUM);
-    printTablo(SMAX);
-    printTablo(PMAX);*/
+     printTablo(PSUM);
+     printTablo(SSUM);
+     printTablo(SMAX);
+     printTablo(PMAX);*/
     
     struct tablo *M = allocateTablo(Q->size);
     
     // Étape 5
-    /*#pragma omp parallel for
-    for (int i = 0; i < Q->size; i++) {
-        long Ms = PMAX->tab[i] - SSUM->tab[i] + Q->tab[i];
-        long Mp = SMAX->tab[i] - PSUM->tab[i] + Q->tab[i];
-        M->tab[i] = Ms + Mp - Q->tab[i];
-    }*/
-    
-    // Simplification de l'étape 5
     #pragma omp parallel for
-     for (int i = 0; i < Q->size; i++)
-         M->tab[i] = PMAX->tab[i] - SSUM->tab[i] + SMAX->tab[i] - PSUM->tab[i] + Q->tab[i];
+    for (int i = 0; i < Q->size; i++) {
+        M->tab[i] = PMAX->tab[i] - SSUM->tab[i] + SMAX->tab[i] - PSUM->tab[i] + Q->tab[i];
+    }
     
     //printTablo(M);
     
