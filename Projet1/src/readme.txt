@@ -1,7 +1,7 @@
 - void printTablo(struct tablo *tmp) : non parallele
 - struct tablo *allocateTablo(int size) : non parallele
 - void freeTablo(struct tablo *tmp) : non parallele
-- struct tablo *parseFileAndFillTablo(char *filePath) : non parallele
+- struct tablo *parseFileAndFillTablo(FILE *file) : non parallele
 - void up(struct tablo *source, struct tablo *dest) : parallele
 - void down(struct tablo *a, struct tablo *b) : parallele
 - void downSuffix(struct tablo *a, struct tablo *b) : parallele

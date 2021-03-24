@@ -34,21 +34,15 @@ void freeTablo(struct tablo *tmp) {
     free(tmp);
 }
 
-struct tablo *parseFileAndFillTablo(char *filePath) {
+struct tablo *parseFileAndFillTablo(FILE *file) {
     struct tablo *source;
-    FILE *file = fopen(filePath, "r");
-    
-    if (file == NULL) {
-        printf("Impossible d'ouvrir le fichier\n");
-        exit(1);
-    }
     
     int size = 0;
     long nb = 0;
     
     // Recherche du nombre d'entiers (long) présent dans le fichier pour éviter de faire des realloc
     fscanf(file, "%ld", &nb);
-    while (!feof (file)) {
+    while (!feof(file)) {
         fscanf(file, "%ld", &nb);
         size++;
     }
@@ -60,13 +54,11 @@ struct tablo *parseFileAndFillTablo(char *filePath) {
     
     // Remplissage du tableau
     fscanf(file, "%ld", &nb);
-    for (int i = 0; !feof (file); ++i) {
+    for (int i = 0; !feof(file); ++i) {
         source->tab[i] = nb;
         fscanf(file, "%ld", &nb);
     }
-    
-    fclose(file);
-    
+        
     return source;
 }
 
@@ -287,7 +279,16 @@ void displayResult(struct tablo *M, struct tablo *source) {
 }
 
 int main(int argc, char **argv) {
-    struct tablo *Q = parseFileAndFillTablo(argv[1]);
+    if (argc < 2) {
+        printf("Fichier manquant en paramètre\n");
+        exit(1);
+    }
+    
+    FILE *file = fopen(argv[1], "r");
+    
+    struct tablo *Q = parseFileAndFillTablo(file);
+    
+    fclose(file);
     
     struct tablo *PSUM = allocateTablo(Q->size);
     struct tablo *SSUM = allocateTablo(Q->size);
