@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <tgmath.h> // fmaxl()
 #include <limits.h> // Élément neutre du max des entiers long
-#include <math.h> // pow(), log()
+#include <math.h> // pow(), log2()
 #include <omp.h> // #pragma
 
 struct tablo {
