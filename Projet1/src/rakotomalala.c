@@ -14,7 +14,7 @@ void printTablo(struct tablo *tmp) {
     printf("[%i] :", tmp->size);
     int size = tmp->size;
     
-    for (int i = 0; i < size; ++i) {
+    for (int i = 0; i < size; i++) {
         printf(" %ld", tmp->tab[i]);
     }
     
@@ -54,7 +54,7 @@ struct tablo *parseFileAndFillTablo(FILE *file) {
     
     // Remplissage du tableau
     fscanf(file, "%ld", &nb);
-    for (int i = 0; !feof(file); ++i) {
+    for (int i = 0; !feof(file); i++) {
         source->tab[i] = nb;
         fscanf(file, "%ld", &nb);
     }
@@ -255,7 +255,7 @@ void displayResult(struct tablo *M, struct tablo *source) {
     int index = 0;
     
     // On cherche la valeur maximale et son index
-    for (int i = 0; i < source->size; ++i) {
+    for (int i = 0; i < source->size; i++) {
         if (max < M->tab[i]) {
             max = M->tab[i];
             index = i;
