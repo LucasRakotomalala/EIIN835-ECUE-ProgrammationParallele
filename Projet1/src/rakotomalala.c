@@ -77,12 +77,9 @@ void up(struct tablo *source, struct tablo *dest) {
     }
     
     // Algorithme de montée
-    for (int i = (int) log2(source->size) - 1; i >= 0; i--) {
-        int beginIndex = pow(2, i);
-        int endIndex = pow(2, i + 1) - 1;
-        
+    for (int i = log2(source->size) - 1; i >= 0; i--) {
         #pragma omp parallel for
-        for (int j = beginIndex; j <= endIndex; j++) {
+        for (int j = pow(2, i); j <= (int) pow(2, i + 1) - 1; j++) {
             dest->tab[j] = dest->tab[2 * j] + dest->tab[2 * j + 1];
         }
     }
@@ -90,16 +87,12 @@ void up(struct tablo *source, struct tablo *dest) {
 
 void down(struct tablo *a, struct tablo *b) {
     b->tab[1] = 0; // Élément neutre de la somme
-    
-    int m = (int) log2(a->size / 2);
-    
+        
     // Algorithme de descente préfixe
-    for (int i = 1; i <= m; i++) {
-        int beginIndex = pow(2, i);
-        int endIndex = pow(2, i + 1) - 1;
+    for (int i = 1; i <= log2(a->size / 2); i++) {
         
         #pragma omp parallel for
-        for (int j = beginIndex; j <= endIndex; j++) {
+        for (int j = pow(2, i); j <= (int) pow(2, i + 1) - 1; j++) {
             if (j % 2 == 0) // Si j est pair
                 b->tab[j] = b->tab[j / 2];
             else
@@ -111,15 +104,11 @@ void down(struct tablo *a, struct tablo *b) {
 void downSuffix(struct tablo *a, struct tablo *b) {
     b->tab[1] = 0;
     
-    int m = (int) log2(a->size / 2);
-    
     // Algorithme de descente suffixe
-    for (int i = 1; i <= m; i++) {
-        int beginIndex = pow(2, i + 1) - 1;
-        int endIndex = pow(2, i);
+    for (int i = 1; i <= log2(a->size / 2); i++) {
         
         #pragma omp parallel for
-        for (int j = beginIndex; j >= endIndex; j--) {
+        for (int j = pow(2, i + 1) - 1; j >= (int) pow(2, i); j--) {
             if (j % 2 == 0) // Si j est pair
                 b->tab[j] = b->tab[j / 2] + a->tab[j + 1];
             else
@@ -136,12 +125,9 @@ void upMax(struct tablo *source, struct tablo *dest) {
     }
     
     // Algorithme de montée
-    for (int i = (int) log2(source->size) - 1; i >= 0; i--) {
-        int beginIndex = pow(2, i);
-        int endIndex = pow(2, i + 1) - 1;
-        
+    for (int i = log2(source->size) - 1; i >= 0; i--) {
         #pragma omp parallel for
-        for (int j = beginIndex; j <= endIndex; j++) {
+        for (int j = pow(2, i); j <= (int) pow(2, i + 1) - 1; j++) {
             dest->tab[j] = fmaxl(dest->tab[2 * j], dest->tab[2 * j + 1]);
         }
     }
@@ -149,16 +135,11 @@ void upMax(struct tablo *source, struct tablo *dest) {
 
 void downMax(struct tablo *a, struct tablo *b) {
     b->tab[1] = LONG_MIN; // Élément neutre du max des entiers long
-    
-    int m = (int) log2(a->size / 2);
-    
-    // Algorithme de descente préfixe max
-    for (int i = 1; i <= m; i++) {
-        int beginIndex = pow(2, i);
-        int endIndex = pow(2, i + 1) - 1;
         
+    // Algorithme de descente préfixe max
+    for (int i = 1; i <= log2(a->size / 2); i++) {
         #pragma omp parallel for
-        for (int j = beginIndex; j <= endIndex; j++) {
+        for (int j = pow(2, i); j <= (int) pow(2, i + 1) - 1; j++) {
             if (j % 2 == 0) // Si j est pair
                 b->tab[j] = b->tab[j / 2];
             else
@@ -170,15 +151,10 @@ void downMax(struct tablo *a, struct tablo *b) {
 void downMaxSuffix(struct tablo *a, struct tablo *b) {
     b->tab[1] = LONG_MIN; // Élément neutre du max des entiers long
     
-    int m = (int) log2(a->size / 2);
-    
     // Algorithme de descente suffixe max
-    for (int i = 1; i <= m; i++) {
-        int beginIndex = pow(2, i + 1) - 1;
-        int endIndex = pow(2, i);
-        
+    for (int i = 1; i <= log2(a->size / 2); i++) {
         #pragma omp parallel for
-        for (int j = beginIndex; j >= endIndex; j--) {
+        for (int j = pow(2, i + 1) - 1; j >= (int) pow(2, i); j--) {
             if (j % 2 == 0) // Si j est pair
                 b->tab[j] = fmaxl(b->tab[j / 2], a->tab[j + 1]);
             else
@@ -188,21 +164,15 @@ void downMaxSuffix(struct tablo *a, struct tablo *b) {
 }
 
 void final(struct tablo *a, struct tablo *b) {
-    int beginIndex = pow(2, log2(a->size / 2));
-    int endIndex = pow(2, log2(a->size / 2) + 1);
-    
     #pragma omp parallel for
-    for (int i = beginIndex; i < endIndex; i++) {
+    for (int i = pow(2, log2(a->size / 2)); i < (int) pow(2, log2(a->size / 2) + 1); i++) {
         b->tab[i] = b->tab[i] + a->tab[i];
     }
 }
 
 void finalMax(struct tablo *a, struct tablo *b) {
-    int beginIndex = pow(2, log2(a->size / 2));
-    int endIndex = pow(2, log2(a->size / 2) + 1);
-    
     #pragma omp parallel for
-    for (int i = beginIndex; i < endIndex; i++) {
+    for (int i = pow(2, log2(a->size / 2)); i < (int) pow(2, log2(a->size / 2) + 1); i++) {
         b->tab[i] = fmaxl(b->tab[i], a->tab[i]);
     }
 }
@@ -217,9 +187,10 @@ void prefixSum(struct tablo *source, struct tablo *dest) {
     down(a, b);
     final(a, b);
     
+    // Copie du résultat dans le tablo 'dest'
     #pragma omp parallel for
     for (int i = 0; i < dest->size; i++) {
-        dest->tab[i] = b->tab[i + source->size]; // Copie du résultat dans le tablo 'dest'
+        dest->tab[i] = b->tab[i + source->size];
     }
     
     freeTablo(a);
@@ -236,9 +207,10 @@ void suffixSum(struct tablo *source, struct tablo *dest) {
     downSuffix(a, b);
     final(a, b);
     
+    // Copie du résultat dans le tablo 'dest'
     #pragma omp parallel for
     for (int i = 0; i < dest->size; i++) {
-        dest->tab[i] = b->tab[i + source->size]; // Copie du résultat dans le tablo 'dest'
+        dest->tab[i] = b->tab[i + source->size];
     }
     
     freeTablo(a);
@@ -255,9 +227,10 @@ void suffixMax(struct tablo *source, struct tablo *dest) {
     downMaxSuffix(a, b);
     finalMax(a, b);
     
+    // Copie du résultat dans le tablo 'dest'
     #pragma omp parallel for
     for (int i = 0; i < dest->size; i++) {
-        dest->tab[i] = b->tab[i + source->size]; // Copie du résultat dans le tablo 'dest'
+        dest->tab[i] = b->tab[i + source->size];
     }
     
     freeTablo(a);
@@ -274,9 +247,10 @@ void prefixMax(struct tablo *source, struct tablo *dest) {
     downMax(a, b);
     finalMax(a, b);
     
+    // Copie du résultat dans le tablo 'dest'
     #pragma omp parallel for
     for (int i = 0; i < dest->size; i++) {
-        dest->tab[i] = b->tab[i + source->size]; // Copie du résultat dans le tablo 'dest'
+        dest->tab[i] = b->tab[i + source->size];
     }
     
     freeTablo(a);
