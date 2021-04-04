@@ -43,7 +43,7 @@ struct tablo *parseFileAndFillTablo(FILE *file) {
     while (fscanf(file, "%ld", &nb) != EOF) {
         size++;
     }
-        
+    
     source = allocateTablo(size);
     
     // Retour au début du fichier
@@ -53,7 +53,7 @@ struct tablo *parseFileAndFillTablo(FILE *file) {
     for (int i = 0; fscanf(file, "%ld", &nb) != EOF; i++) {
         source->tab[i] = nb;
     }
-        
+    
     return source;
 }
 
@@ -78,7 +78,6 @@ void down(struct tablo *a, struct tablo *b) {
     
     // Algorithme de descente préfixe
     for (int i = 1; i <= log2(a->size / 2); i++) {
-        
         #pragma omp parallel for
         for (int j = pow(2, i); j <= (int) pow(2, i + 1) - 1; j++) {
             if (j % 2 == 0) // Si j est pair
@@ -94,7 +93,6 @@ void downSuffix(struct tablo *a, struct tablo *b) {
     
     // Algorithme de descente suffixe
     for (int i = 1; i <= log2(a->size / 2); i++) {
-        
         #pragma omp parallel for
         for (int j = pow(2, i + 1) - 1; j >= (int) pow(2, i); j--) {
             if (j % 2 == 0) // Si j est pair
