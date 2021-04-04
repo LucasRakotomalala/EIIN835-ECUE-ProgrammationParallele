@@ -37,25 +37,21 @@ struct tablo *parseFileAndFillTablo(FILE *file) {
     struct tablo *source;
     
     int size = 0;
-    long nb = 0;
+    long nb;
     
     // Recherche du nombre d'entiers (long) présent dans le fichier pour éviter de faire des realloc
-    fscanf(file, "%ld", &nb);
-    while (!feof(file)) {
-        fscanf(file, "%ld", &nb);
+    while (fscanf(file, "%ld", &nb) != EOF) {
         size++;
     }
-    
+        
     source = allocateTablo(size);
     
     // Retour au début du fichier
     rewind(file);
     
     // Remplissage du tableau
-    fscanf(file, "%ld", &nb);
-    for (int i = 0; !feof(file); i++) {
+    for (int i = 0; fscanf(file, "%ld", &nb) != EOF; i++) {
         source->tab[i] = nb;
-        fscanf(file, "%ld", &nb);
     }
         
     return source;
@@ -250,7 +246,8 @@ void prefixMax(struct tablo *source, struct tablo *dest) {
 }
 
 void displayResult(struct tablo *M, struct tablo *source) {
-    long max = 0;
+    long max = LONG_MIN;
+    long sum_subsequence = 0;
     int index = 0;
     
     // On cherche la valeur maximale et son index
@@ -265,12 +262,12 @@ void displayResult(struct tablo *M, struct tablo *source) {
     printf("%ld", max);
     // Tant que cette valeur est présente dans M, on écrit l'entier correspondant du tableau source
     while (index < M->size) {
-        if (!(M->tab[index] == max)) {
-            index--;
+        if (!(M->tab[index] == max) || (M->tab[index] == sum_subsequence)) {
             break;
         }
         else {
             printf(" %ld", source->tab[index]);
+            sum_subsequence += source->tab[index];
             index++;
         }
     }
