@@ -53,7 +53,7 @@ struct tablo *parseFileAndFillTablo(FILE *file) {
     // Retour au début du fichier
     rewind(file);
     
-    // Remplissage du tableau
+    // Remplissage du tablo
     for (int i = 0; fscanf(file, "%ld", &nb) != EOF; i++) {
         source->tab[i] = nb;
     }
@@ -65,7 +65,7 @@ struct tablo *parseFileAndFillTablo(FILE *file) {
  Mise en application de l'algorithme donné dans le cours "Simulation Prefix" (Page 20 du .pdf)
  */
 void up(struct tablo *source, struct tablo *dest) {
-    // Copie du tableau initial à la fin du nouveau tableau
+    // Copie du tablo initial à la fin du nouveau tablo
     #pragma omp parallel for
     for (int i = 0; i < source->size; i++) {
         dest->tab[i + source->size] = source->tab[i];
@@ -101,7 +101,7 @@ void down(struct tablo *a, struct tablo *b) {
 }
 
 /**
- Même principe que la méthode down() mais on parcout la tableau à l'envers
+ Même principe que la méthode down() mais on parcout le tablo  à l'envers
  */
 void downSuffix(struct tablo *a, struct tablo *b) {
     b->tab[1] = 0;
@@ -123,7 +123,7 @@ void downSuffix(struct tablo *a, struct tablo *b) {
  Même principe que la méthode up() mais on applique le max au lieu de la somme
  */
 void upMax(struct tablo *source, struct tablo *dest) {
-    // Copie du tableau initial à la fin du nouveau tableau
+    // Copie du tablo initial à la fin du nouveau tablo
     #pragma omp parallel for
     for (int i = 0; i < source->size; i++) {
         dest->tab[i + source->size] = source->tab[i];
@@ -252,7 +252,7 @@ void suffixSum(struct tablo *source, struct tablo *dest) {
 }
 
 /**
- * Calcule le max préfixe d'un tablo
+ * Calcule le max suffixe d'un tablo
  * @param *source tablo de référence pour le calcul
  * @param *dest tablo résultat
  * @return void
@@ -278,7 +278,7 @@ void suffixMax(struct tablo *source, struct tablo *dest) {
 }
 
 /**
- * Calcule le max suffixe d'un tablo
+ * Calcule le max préfixe d'un tablo
  * @param *source tablo de référence pour le calcul
  * @param *dest tablo résultat
  * @return void
@@ -304,8 +304,8 @@ void prefixMax(struct tablo *source, struct tablo *dest) {
 }
 
 /**
- * Affiche la somme maximal d'une sous-séquence et la sous-séquence correspondante
- * @param *M
+ * Affiche la somme maximale d'une sous-séquence et la sous-séquence correspondante
+ * @param *M tablo maximal
  * @param *source tablo de référence
  * @return void
  */
@@ -324,7 +324,7 @@ void displayResult(struct tablo *M, struct tablo *source) {
     
     // On affiche le max en premier
     printf("%ld", max);
-    // Tant que cette valeur est présente dans M, on écrit l'entier correspondant du tableau source
+    // Tant que cette valeur est présente dans M, on écrit l'entier correspondant du tablo 'source'
     while (index < M->size) {
         if (!(M->tab[index] == max) || (M->tab[index] == sum_subsequence)) {
             break;
