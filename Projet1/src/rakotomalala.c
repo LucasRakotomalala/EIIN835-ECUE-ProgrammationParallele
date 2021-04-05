@@ -101,7 +101,7 @@ void down(struct tablo *a, struct tablo *b) {
 }
 
 /**
- Même principe que la méthode down() mais on parcout le tablo  à l'envers
+ Même principe que la méthode down() mais on parcourt le tablo à l'envers en adaptant aussi les indices
  */
 void downSuffix(struct tablo *a, struct tablo *b) {
     b->tab[1] = 0;
