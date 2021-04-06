@@ -311,7 +311,6 @@ void prefixMax(struct tablo *source, struct tablo *dest) {
  */
 void displayResult(struct tablo *M, struct tablo *source) {
     long max = LONG_MIN;
-    long sum_subsequence = 0;
     int index = 0;
     
     // On cherche la valeur maximale et son index
@@ -326,12 +325,11 @@ void displayResult(struct tablo *M, struct tablo *source) {
     printf("%ld", max);
     // Tant que cette valeur est présente dans M, on écrit l'entier correspondant du tablo 'source'
     while (index < M->size) {
-        if (!(M->tab[index] == max) || (M->tab[index] == sum_subsequence)) {
+        if (!(M->tab[index] == max)) {
             break;
         }
         else {
             printf(" %ld", source->tab[index]);
-            sum_subsequence += source->tab[index];
             index++;
         }
     }
