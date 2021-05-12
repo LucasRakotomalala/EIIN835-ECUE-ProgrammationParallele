@@ -49,7 +49,7 @@ void freeMatrix(struct Matrix *matrix) {
         free(matrix->data[i]);
     }
     
-    free(matrix->data);
+    //free(matrix->data);
     free(matrix);
 }
 
@@ -80,7 +80,7 @@ void product(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* resul
 
 void floyd(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* result, int startZ) {
     result->data[0][startZ] = INF;
-    //#pragma omp parallel for // Ne marche pas en parallèle
+    //#pragma omp parallel for // Ne marche pas tout le temps
     for (int x = 0; x < W_row->columns; x++) {
         if (W_row->data[0][x] + W_column->data[0][x] < result->data[0][startZ])
             result->data[0][startZ] = W_row->data[0][x] + W_column->data[0][x];
@@ -252,6 +252,10 @@ int main(int argc, char* argv[]) {
         
         printMatrix(result);
         
+        freeMatrix(A);
+        freeMatrix(W_row);
+        freeMatrix(W_column);
+        freeMatrix(result);
     } else {
         // Réception de la taille de la matrice du processus précedents
         MPI_Recv(&matrix_size, 1, MPI_INT, previous, TAG_SIZES, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -277,6 +281,10 @@ int main(int argc, char* argv[]) {
         }
             
         gather(result, tab_size, rank, nbr_procs, next, previous);
+        
+        freeMatrix(W_row);
+        freeMatrix(W_column);
+        freeMatrix(result);
     }
     
     MPI_Finalize();
