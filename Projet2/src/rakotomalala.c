@@ -3,7 +3,7 @@
 #include <mpi.h>
 #include <omp.h>
 
-#define INF 999
+#define INF -1
 
 #define TAG_SIZES 11
 #define TAG_SCATTER_ROWS 12
@@ -11,6 +11,25 @@
 #define TAG_CIRCULATE 14
 #define TAG_GATHER 15
 
+
+// Redéfinition du minimum et de l'addition pour l'algorithme de Floyd-Marshall
+int min(int a, int b) {
+    if (a < 0)
+        return b;
+    else if (b < 0)
+        return a;
+    else
+        return a < b ? a : b;
+}
+
+int add(int a, int b) {
+    if (a < 0 || b < 0)
+        return -1;
+    else
+        return a + b;
+}
+
+// Structure utilisée pour le projet
 struct Matrix {
     int** data;
     int columns;
@@ -23,7 +42,7 @@ struct Matrix {
 void printMatrix(struct Matrix *matrix) {
     for (int y = 0; y < matrix->rows; y++) {
         for (int x = 0; x < matrix->columns; x++) {
-            if (matrix->data[y][x] >= INF)
+            if (matrix->data[y][x] == INF)
                 printf("i ");
             else
                 printf("%d ", matrix->data[y][x]);
@@ -87,6 +106,7 @@ struct Matrix* transpose(struct Matrix* matrix) {
 void product(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* result, int nbr_tab, int startX) {
     int i = 0;
     for (int z = startX; z < (nbr_tab + startX); z++) {
+        #pragma omp parallel for
         for (int y = 0; y < nbr_tab; y++) {
             result->data[y][z] = 0;
             for (int x = 0; x < W_row->columns; x++) {
@@ -103,11 +123,11 @@ void product(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* resul
 void floyd(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* result, int nbr_tab, int startX) {
     int i = 0;
     for (int z = startX; z < (nbr_tab + startX); z++) {
+        #pragma omp parallel for
         for (int y = 0; y < nbr_tab; y++) {
             result->data[y][z] = INF;
             for (int x = 0; x < W_row->columns; x++) {
-                if (W_row->data[y][x] + W_column->data[i][x] < result->data[y][x])
-                    result->data[y][z] = W_row->data[y][x] + W_column->data[i][x];
+                result->data[y][z] = min(result->data[y][z], (add(W_row->data[y][x], W_column->data[i][x])));
             }
         }
         i++;
@@ -294,26 +314,23 @@ int main(int argc, char* argv[]) {
         }
                 
         // Envoie de la taille de la matrice à P1
-        MPI_Send(&tab_size, 1, MPI_INT, next, TAG_SIZES, MPI_COMM_WORLD);
-        MPI_Send(&nbr_tab, 1, MPI_INT, next, TAG_SIZES, MPI_COMM_WORLD);
+        if (nbr_procs_used > 1) {
+            MPI_Send(&tab_size, 1, MPI_INT, next, TAG_SIZES, MPI_COMM_WORLD);
+            MPI_Send(&nbr_tab, 1, MPI_INT, next, TAG_SIZES, MPI_COMM_WORLD);
+        }
         
         for (int i = 0; i < nbr_tab; i++) {
             W_row->data[i] = W->data[i];
             W_column->data[i] = transpose(W)->data[i];
-            //W_row->data[i] = A->data[i];
-            //W_column->data[i] = transpose(A)->data[i];
         }
             
         // Scatter W en lignes et en colonnes
         for (int i = 1; i < nbr_procs_used; i++) {
             scatterInit(W, tab_size, (i * nbr_tab), ((i * nbr_tab) + nbr_tab), next, TAG_SCATTER_ROWS);
             scatterInit(transpose(W), tab_size, (i * nbr_tab), ((i * nbr_tab) + nbr_tab), next, TAG_SCATTER_COLUMNS);
-            //scatterInit(A, tab_size, (i * nbr_tab), ((i * nbr_tab) + nbr_tab), next, TAG_SCATTER_ROWS);
-            //scatterInit(transpose(A), tab_size, (i * nbr_tab), ((i * nbr_tab) + nbr_tab), next, TAG_SCATTER_COLUMNS);
         }
 
         for (int n = 0; n < tab_size - 1; n++) { // Matrice à la puissance N
-        //for (int n = 0; n < 3; n++) { // Matrice à la puissance 4
             if (n != 0) {
                 for (int y = 0; y < nbr_tab; y++) {
                     for (int x = 0; x < tab_size; x++)
@@ -322,7 +339,6 @@ int main(int argc, char* argv[]) {
             }
             for (int i = nbr_procs_used; i > 0; i--) {
                 floyd(W_row, W_column, result, nbr_tab, (nbr_tab * i) % tab_size);
-                //product(W_row, W_column, result, nbr_tab, (nbr_tab * i) % tab_size);
                 circulate(W_column, nbr_tab, tab_size, next, previous);
             }
         }
@@ -364,7 +380,6 @@ int main(int argc, char* argv[]) {
         scatter(W_column, previous, next, nbr_tab, tab_size, nbr_procs_used, rank, TAG_SCATTER_COLUMNS);
         
         for (int n = 0; n < tab_size - 1; n++) { // Matrice à la puissance N
-        //for (int n = 0; n < 3; n++) { // Matrice à la puissance 4
             if (n != 0) {
                 for (int y = 0; y < nbr_tab; y++) {
                     for (int x = 0; x < tab_size; x++)
@@ -374,7 +389,6 @@ int main(int argc, char* argv[]) {
             for (int i = nbr_procs_used; i > 0; i--) {
                 int startX = ((nbr_tab * (i + rank)) % tab_size);
                 floyd(W_row, W_column, result, nbr_tab, startX);
-                //product(W_row, W_column, result, nbr_tab, startX);
                 circulate(W_column, nbr_tab, tab_size, next, previous);
             }
         }
