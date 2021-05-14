@@ -5,10 +5,11 @@
 
 #define INF 999
 
-#define TAG_SIZES 123
-#define TAG_SCATTER 12
-#define TAG_GATHER 16
-#define TAG_CIRCULATE 15
+#define TAG_SIZES 11
+#define TAG_SCATTER_ROWS 12
+#define TAG_SCATTER_COLUMNS 13
+#define TAG_CIRCULATE 14
+#define TAG_GATHER 15
 
 struct Matrix {
     int** data;
@@ -16,6 +17,9 @@ struct Matrix {
     int rows;
 };
 
+/**
+ * Affiche une matrice sur la sortie standard
+ */
 void printMatrix(struct Matrix *matrix) {
     for (int y = 0; y < matrix->rows; y++) {
         for (int x = 0; x < matrix->columns; x++) {
@@ -28,6 +32,9 @@ void printMatrix(struct Matrix *matrix) {
     }
 }
 
+/**
+ * Permet d'allouer correctement une matrice
+ */
 struct Matrix* allocateMatrix(int columns, int rows) {
     struct Matrix *tmp = malloc(sizeof(struct Matrix));
     
@@ -43,13 +50,17 @@ struct Matrix* allocateMatrix(int columns, int rows) {
     return tmp;
 }
 
+
+/**
+ * Permet de free une matrice
+ */
 void freeMatrix(struct Matrix *matrix) {
     #pragma omp parallel for
     for (int i = 0; i < matrix->rows; i++) {
         free(matrix->data[i]);
     }
     
-    //free(matrix->data);
+    free(matrix->data);
     free(matrix);
 }
 
@@ -70,20 +81,36 @@ struct Matrix* transpose(struct Matrix* matrix) {
     return transpose;
 }
 
-void product(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* result, int startZ) {
-    result->data[0][startZ] = 0;
-    //#pragma omp parallel for // Ne marche pas en parallèle
-    for (int x = 0; x < W_row->columns; x++) {
-        result->data[0][startZ] += (W_row->data[0][x] * W_column->data[0][x]);
+/**
+ * Effectue le produit matriciel entre une ligne et une colonne et stocke le résultat dans le bon indice de la matrice 'result'
+ */
+void product(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* result, int nbr_tab, int startX) {
+    int i = 0;
+    for (int z = startX; z < (nbr_tab + startX); z++) {
+        for (int y = 0; y < nbr_tab; y++) {
+            result->data[y][z] = 0;
+            for (int x = 0; x < W_row->columns; x++) {
+                result->data[y][z] += (W_row->data[y][x] * W_column->data[i][x]);
+            }
+        }
+        i++;
     }
 }
 
-void floyd(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* result, int startZ) {
-    result->data[0][startZ] = INF;
-    //#pragma omp parallel for // Ne marche pas tout le temps
-    for (int x = 0; x < W_row->columns; x++) {
-        if (W_row->data[0][x] + W_column->data[0][x] < result->data[0][startZ])
-            result->data[0][startZ] = W_row->data[0][x] + W_column->data[0][x];
+/**
+ * Applique l'alogorithme de Floyd-Marshall entre une ligne et une colonne et stocke le résultat dans le bon indice de la matrice 'result'
+ */
+void floyd(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* result, int nbr_tab, int startX) {
+    int i = 0;
+    for (int z = startX; z < (nbr_tab + startX); z++) {
+        for (int y = 0; y < nbr_tab; y++) {
+            result->data[y][z] = INF;
+            for (int x = 0; x < W_row->columns; x++) {
+                if (W_row->data[y][x] + W_column->data[i][x] < result->data[y][x])
+                    result->data[y][z] = W_row->data[y][x] + W_column->data[i][x];
+            }
+        }
+        i++;
     }
 }
 
@@ -127,6 +154,9 @@ struct Matrix* parseFileAndFillMatrix(char* filePath) {
     return matrix;
 }
 
+/**
+ * Transforme la matrice lu en matrice adjacente W
+ */
 struct Matrix* transformToW(struct Matrix* A) {
     struct Matrix *W = allocateMatrix(A->columns, A->rows);
 
@@ -147,51 +177,75 @@ struct Matrix* transformToW(struct Matrix* A) {
 }
 
 /**
- * Scatter une matrice et stocke la 1ère ligne dans le 2ème paramètre
+ * Permet à P0 d'envoyer un bout de matricesà P1
  */
-void scatter(struct Matrix* W, struct Matrix* matrix, int tab_size, int rank, int nbr_procs, int next) {
-    matrix->data[0] = W->data[0];
-    for (int i = nbr_procs - 1; i > 0; i--) {
-        MPI_Send(W->data[i], tab_size, MPI_INT, next, TAG_SCATTER, MPI_COMM_WORLD);
+void scatterInit(struct Matrix* W, int tab_size, int startY, int endY, int next, int tag) {
+    for (int y = startY; y < endY; y++) {
+        MPI_Send(W->data[y], tab_size, MPI_INT, next, tag, MPI_COMM_WORLD);
     }
 }
 
-void receiveAndSend(struct Matrix* matrix, int tab_size, int rank, int nbr_procs, int next, int previous) {
+/**
+ * Permet à un processus de recevoir un bout de matrice de son prédécesseur, de récupérer le bout qui l'intéresse et d'envoyer le reste au suivant
+ */
+void scatter(struct Matrix* matrix, int previous, int next, int nbr_tab, int tab_size, int nbr_procs_used, int rank, int tag) {
     MPI_Status status;
-    struct Matrix* tmp = allocateMatrix(tab_size, 1);
     
-    for (int i = nbr_procs - rank - 1; i > 0; i--) {
-        MPI_Recv(tmp->data[0], tab_size, MPI_INT, previous, TAG_SCATTER, MPI_COMM_WORLD, &status);
-        MPI_Send(tmp->data[0], tab_size, MPI_INT, next, TAG_SCATTER, MPI_COMM_WORLD);
+    for (int y = 0; y < nbr_tab; y++) {
+        MPI_Recv(matrix->data[y], tab_size, MPI_INT, previous, tag, MPI_COMM_WORLD, &status);
     }
     
-    MPI_Recv(matrix->data[0], tab_size, MPI_INT, previous, TAG_SCATTER, MPI_COMM_WORLD, &status);
-    
-    freeMatrix(tmp);
-}
-
-void gather(struct Matrix* result, int tab_size, int rank, int nbr_procs, int next, int previous) {
-    MPI_Status status;
-    
-    if (rank == 0) {
-        for (int i = 1; i < nbr_procs; i++) {
-            MPI_Recv(result->data[i], tab_size, MPI_INT, next, TAG_GATHER, MPI_COMM_WORLD, &status);
-        }
-    } else {
-        //MPI_Send(result->data[rank], tab_size, MPI_INT, previous, TAG_GATHER, MPI_COMM_WORLD);
-        MPI_Send(result->data[0], tab_size, MPI_INT, previous, TAG_GATHER, MPI_COMM_WORLD);
-        for (int i = 1; i < (nbr_procs - rank); i++) {
-            MPI_Recv(result->data[0], tab_size, MPI_INT, next, TAG_GATHER, MPI_COMM_WORLD, &status);
-            MPI_Send(result->data[0], tab_size, MPI_INT, previous, TAG_GATHER, MPI_COMM_WORLD);
+    int tmp[tab_size];
+    for (int i = rank; i < nbr_procs_used - 1; i++) {
+        for (int y = 0; y < nbr_tab; y++) {
+            MPI_Recv(&tmp, tab_size, MPI_INT, previous, tag, MPI_COMM_WORLD, &status);
+            MPI_Send(&tmp, tab_size, MPI_INT, next, tag, MPI_COMM_WORLD);
         }
     }
 }
 
-void circulate(struct Matrix* W_column, int tab_size, int next, int previous) {
+/**
+ * Permet à un processus d'envoyer la matrice résultat à son prédécesseur, et de recevoir du suivant les matrices résultats
+ */
+void gather(struct Matrix* result, int previous, int next, int nbr_tab, int tab_size, int nbr_procs_used, int rank) {
     MPI_Status status;
     
-    MPI_Send(W_column->data[0], tab_size, MPI_INT, next, TAG_CIRCULATE, MPI_COMM_WORLD);
-    MPI_Recv(W_column->data[0], tab_size, MPI_INT, previous, TAG_CIRCULATE, MPI_COMM_WORLD, &status);
+    for (int y = 0; y < nbr_tab; y++) {
+        MPI_Send(result->data[y], tab_size, MPI_INT, previous, TAG_GATHER, MPI_COMM_WORLD);
+    }
+    
+    int tmp[tab_size];
+    for (int i = 0; i < (nbr_procs_used - 1) - rank; i++) {
+        for (int y = 0; y < nbr_tab; y++) {
+            MPI_Recv(&tmp, tab_size, MPI_INT, next, TAG_GATHER, MPI_COMM_WORLD, &status);
+            MPI_Send(&tmp, tab_size, MPI_INT, previous, TAG_GATHER, MPI_COMM_WORLD);
+        }
+    }
+}
+
+/**
+ * Permet à P0 de récupérer toutes les lignes et des les placer au bon endroit dans sa matrice
+ */
+void gatherFinal(struct Matrix* result, int next, int nbr_tab, int tab_size, int nbr_procs_used) {
+    MPI_Status status;
+    
+    for (int i = 0; i < nbr_procs_used - 1; i++) {
+        for (int j = 0; j < nbr_tab; j++) {
+            MPI_Recv(result->data[nbr_tab + (nbr_tab * i) + j], tab_size, MPI_INT, next, TAG_GATHER, MPI_COMM_WORLD, &status);
+        }
+    }
+}
+
+/**
+ * Envoie une matrice au suivant et reçoit une matrice de son prédécesseur
+ */
+void circulate(struct Matrix* W_column, int nbr_tab, int tab_size, int next, int previous) {
+    MPI_Status status;
+    
+    for (int i = 0; i < nbr_tab; i++) {
+        MPI_Send(W_column->data[i], tab_size, MPI_INT, next, TAG_CIRCULATE, MPI_COMM_WORLD);
+        MPI_Recv(W_column->data[i], tab_size, MPI_INT, previous, TAG_CIRCULATE, MPI_COMM_WORLD, &status);
+    }
 }
 
 int main(int argc, char* argv[]) {
@@ -202,16 +256,17 @@ int main(int argc, char* argv[]) {
     
     int rank;
     int nbr_procs;
+    int nbr_procs_used;
     
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &nbr_procs);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     
-    int previous = ((rank - 1 + nbr_procs) % nbr_procs);
-    int next = ((rank + 1) % nbr_procs);
+    int previous = ((rank - 1 + nbr_procs) % nbr_procs); // TODO: Maybe change with 'nbr_procs_used' when necessary ?
+    int next = ((rank + 1) % nbr_procs); // TODO: Maybe change with 'nbr_procs_used' when necessary ?
     
-    int matrix_size;
     int tab_size;
+    int nbr_tab;
     
     struct Matrix* W_row;
     struct Matrix* W_column;
@@ -223,64 +278,106 @@ int main(int argc, char* argv[]) {
         struct Matrix* A = parseFileAndFillMatrix(argv[1]);
         struct Matrix* W = transformToW(A);
         
-        //printf("Matrice W:\n");
-        //printMatrix(W);
-        //printf("\n");
-                
         tab_size = W->rows;
-        matrix_size = tab_size * tab_size;
+        nbr_tab = tab_size / nbr_procs;
         
-        W_row = allocateMatrix(tab_size, 1);
-        W_column = allocateMatrix(tab_size, 1);
-        
+        W_row = allocateMatrix(tab_size, nbr_tab);
+        W_column = allocateMatrix(tab_size, nbr_tab);
         result = allocateMatrix(tab_size, tab_size);
-
-        // Envoie de la taille de la matrice à P1
-        MPI_Send(&matrix_size, 1, MPI_INT, next, TAG_SIZES, MPI_COMM_WORLD);
-        MPI_Send(&tab_size, 1, MPI_INT, next, TAG_SIZES, MPI_COMM_WORLD);
         
+        if ((tab_size / nbr_procs) < 1) {
+            nbr_tab = 1;
+            nbr_procs_used = tab_size;
+        } else {
+            nbr_tab = (int) (tab_size / nbr_procs);
+            nbr_procs_used = nbr_procs;
+        }
+                
+        // Envoie de la taille de la matrice à P1
+        MPI_Send(&tab_size, 1, MPI_INT, next, TAG_SIZES, MPI_COMM_WORLD);
+        MPI_Send(&nbr_tab, 1, MPI_INT, next, TAG_SIZES, MPI_COMM_WORLD);
+        
+        for (int i = 0; i < nbr_tab; i++) {
+            W_row->data[i] = W->data[i];
+            W_column->data[i] = transpose(W)->data[i];
+            //W_row->data[i] = A->data[i];
+            //W_column->data[i] = transpose(A)->data[i];
+        }
+            
         // Scatter W en lignes et en colonnes
-        scatter(W, W_row, tab_size, rank, nbr_procs, next);
-        scatter(transpose(W), W_column, tab_size, rank, nbr_procs, next);
+        for (int i = 1; i < nbr_procs_used; i++) {
+            scatterInit(W, tab_size, (i * nbr_tab), ((i * nbr_tab) + nbr_tab), next, TAG_SCATTER_ROWS);
+            scatterInit(transpose(W), tab_size, (i * nbr_tab), ((i * nbr_tab) + nbr_tab), next, TAG_SCATTER_COLUMNS);
+            //scatterInit(A, tab_size, (i * nbr_tab), ((i * nbr_tab) + nbr_tab), next, TAG_SCATTER_ROWS);
+            //scatterInit(transpose(A), tab_size, (i * nbr_tab), ((i * nbr_tab) + nbr_tab), next, TAG_SCATTER_COLUMNS);
+        }
 
-        for (int i = nbr_procs; i > 0; i--) {
-            floyd(W_row, W_column, result, (rank + i) % nbr_procs);
-            circulate(W_column, tab_size, next, previous);
+        for (int n = 0; n < tab_size - 1; n++) {
+        //for (int n = 0; n < 3; n++) { // Puissance 4
+            if (n != 0) {
+                for (int y = 0; y < nbr_tab; y++) {
+                    for (int x = 0; x < tab_size; x++)
+                        W_row->data[y][x] = result->data[y][x];
+                }
+            }
+            for (int i = nbr_procs_used; i > 0; i--) {
+                floyd(W_row, W_column, result, nbr_tab, (nbr_tab * i) % tab_size);
+                //product(W_row, W_column, result, nbr_tab, (nbr_tab * i) % tab_size);
+                circulate(W_column, nbr_tab, tab_size, next, previous);
+            }
         }
         
-        gather(result, tab_size, rank, nbr_procs, next, previous);
-        
-        printMatrix(result);
+        gatherFinal(result, next, nbr_tab, tab_size, nbr_procs_used);
+
+        //printMatrix(result);
         
         freeMatrix(A);
         freeMatrix(W_row);
         freeMatrix(W_column);
         freeMatrix(result);
     } else {
+        MPI_Status status;
+
         // Réception de la taille de la matrice du processus précedents
-        MPI_Recv(&matrix_size, 1, MPI_INT, previous, TAG_SIZES, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        MPI_Recv(&tab_size, 1, MPI_INT, previous, TAG_SIZES, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        
+        MPI_Recv(&tab_size, 1, MPI_INT, previous, TAG_SIZES, MPI_COMM_WORLD, &status);
+        MPI_Recv(&nbr_tab, 1, MPI_INT, previous, TAG_SIZES, MPI_COMM_WORLD, &status);
+                
         // Allocation de la matrice
-        W_row = allocateMatrix(tab_size, 1);
-        W_column = allocateMatrix(tab_size, 1);
-        result = allocateMatrix(tab_size, 1);
+        W_row = allocateMatrix(tab_size, nbr_tab);
+        W_column = allocateMatrix(tab_size, nbr_tab);
+        result = allocateMatrix(tab_size, nbr_tab);
         
         // Envoie de la taille de la matrice au processus suivant si le prochain n'est pas 0
         if (rank != nbr_procs - 1) {
-            MPI_Send(&matrix_size, 1, MPI_INT, next, TAG_SIZES, MPI_COMM_WORLD);
             MPI_Send(&tab_size, 1, MPI_INT, next, TAG_SIZES, MPI_COMM_WORLD);
+            MPI_Send(&nbr_tab, 1, MPI_INT, next, TAG_SIZES, MPI_COMM_WORLD);
         }
         
-        receiveAndSend(W_row, tab_size, rank, nbr_procs, next, previous);
-        receiveAndSend(W_column, tab_size, rank, nbr_procs, next, previous);
+        if ((tab_size / nbr_procs) < 1)
+            nbr_procs_used = tab_size;
+        else
+            nbr_procs_used = nbr_procs;
         
-        for (int i = 0; i < nbr_procs; i++) {
-            floyd(W_row, W_column, result, (rank - i + nbr_procs) % nbr_procs);
-            circulate(W_column, tab_size, next, previous);
+        scatter(W_row, previous, next, nbr_tab, tab_size, nbr_procs_used, rank, TAG_SCATTER_ROWS);
+        scatter(W_column, previous, next, nbr_tab, tab_size, nbr_procs_used, rank, TAG_SCATTER_COLUMNS);
+        
+        for (int n = 0; n < tab_size - 1; n++) {
+        //for (int n = 0; n < 3; n++) { // Puissance 3
+            if (n != 0) {
+                for (int y = 0; y < nbr_tab; y++) {
+                    for (int x = 0; x < tab_size; x++)
+                        W_row->data[y][x] = result->data[y][x];
+                }
+            }
+            for (int i = nbr_procs_used; i > 0; i--) {
+                int startX = ((nbr_tab * (i + rank)) % tab_size);
+                floyd(W_row, W_column, result, nbr_tab, startX);
+                //product(W_row, W_column, result, nbr_tab, startX);
+                circulate(W_column, nbr_tab, tab_size, next, previous);
+            }
         }
-            
-        gather(result, tab_size, rank, nbr_procs, next, previous);
+
+        gather(result, previous, next, nbr_tab, tab_size, nbr_procs_used, rank);
         
         freeMatrix(W_row);
         freeMatrix(W_column);
