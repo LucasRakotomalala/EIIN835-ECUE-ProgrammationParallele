@@ -312,8 +312,8 @@ int main(int argc, char* argv[]) {
             //scatterInit(transpose(A), tab_size, (i * nbr_tab), ((i * nbr_tab) + nbr_tab), next, TAG_SCATTER_COLUMNS);
         }
 
-        for (int n = 0; n < tab_size - 1; n++) {
-        //for (int n = 0; n < 3; n++) { // Puissance 4
+        for (int n = 0; n < tab_size - 1; n++) { // Matrice à la puissance N
+        //for (int n = 0; n < 3; n++) { // Matrice à la puissance 4
             if (n != 0) {
                 for (int y = 0; y < nbr_tab; y++) {
                     for (int x = 0; x < tab_size; x++)
@@ -327,9 +327,11 @@ int main(int argc, char* argv[]) {
             }
         }
         
+        // Récupération de tous les résultats
         gatherFinal(result, next, nbr_tab, tab_size, nbr_procs_used);
 
-        //printMatrix(result);
+        // Affichage du résultat final
+        printMatrix(result);
         
         freeMatrix(A);
         freeMatrix(W_row);
@@ -342,7 +344,7 @@ int main(int argc, char* argv[]) {
         MPI_Recv(&tab_size, 1, MPI_INT, previous, TAG_SIZES, MPI_COMM_WORLD, &status);
         MPI_Recv(&nbr_tab, 1, MPI_INT, previous, TAG_SIZES, MPI_COMM_WORLD, &status);
                 
-        // Allocation de la matrice
+        // Allocation des matrices
         W_row = allocateMatrix(tab_size, nbr_tab);
         W_column = allocateMatrix(tab_size, nbr_tab);
         result = allocateMatrix(tab_size, nbr_tab);
@@ -361,8 +363,8 @@ int main(int argc, char* argv[]) {
         scatter(W_row, previous, next, nbr_tab, tab_size, nbr_procs_used, rank, TAG_SCATTER_ROWS);
         scatter(W_column, previous, next, nbr_tab, tab_size, nbr_procs_used, rank, TAG_SCATTER_COLUMNS);
         
-        for (int n = 0; n < tab_size - 1; n++) {
-        //for (int n = 0; n < 3; n++) { // Puissance 3
+        for (int n = 0; n < tab_size - 1; n++) { // Matrice à la puissance N
+        //for (int n = 0; n < 3; n++) { // Matrice à la puissance 4
             if (n != 0) {
                 for (int y = 0; y < nbr_tab; y++) {
                     for (int x = 0; x < tab_size; x++)
@@ -377,6 +379,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        // Récupération des résultats des suivants et envoie des résultats au précédent
         gather(result, previous, next, nbr_tab, tab_size, nbr_procs_used, rank);
         
         freeMatrix(W_row);
