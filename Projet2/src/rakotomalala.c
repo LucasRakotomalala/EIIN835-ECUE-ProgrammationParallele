@@ -11,7 +11,6 @@
 #define TAG_CIRCULATE 14
 #define TAG_GATHER 15
 
-
 // Redéfinition du minimum et de l'addition pour l'algorithme de Floyd-Marshall
 int min(int a, int b) {
     if (a < 0)
@@ -298,6 +297,7 @@ int main(int argc, char* argv[]) {
     if (rank == 0) {
         // Parse du fichier
         struct Matrix* A = parseFileAndFillMatrix(argv[1]);
+        // Transformation de la matrice A en matrice adjacente W
         struct Matrix* W = transformToW(A);
         
         tab_size = W->rows;
