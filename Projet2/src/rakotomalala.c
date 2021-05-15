@@ -109,6 +109,7 @@ void product(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* resul
         #pragma omp parallel for
         for (int y = 0; y < nbr_tab; y++) {
             result->data[y][z] = 0;
+            #pragma omp parallel for
             for (int x = 0; x < W_row->columns; x++) {
                 result->data[y][z] += (W_row->data[y][x] * W_column->data[i][x]);
             }
@@ -126,6 +127,7 @@ void floyd(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* result,
         #pragma omp parallel for
         for (int y = 0; y < nbr_tab; y++) {
             result->data[y][z] = INF;
+            #pragma omp parallel for
             for (int x = 0; x < W_row->columns; x++) {
                 result->data[y][z] = min(result->data[y][z], (add(W_row->data[y][x], W_column->data[i][x])));
             }
@@ -235,7 +237,7 @@ void gather(struct Matrix* result, int previous, int next, int nbr_tab, int tab_
     }
     
     int tmp[tab_size];
-    for (int i = 0; i < (nbr_procs_used - 1) - rank; i++) {
+    for (int i = rank; i < nbr_procs_used - 1; i++) {
         for (int y = 0; y < nbr_tab; y++) {
             MPI_Recv(&tmp, tab_size, MPI_INT, next, TAG_GATHER, MPI_COMM_WORLD, &status);
             MPI_Send(&tmp, tab_size, MPI_INT, previous, TAG_GATHER, MPI_COMM_WORLD);
@@ -299,7 +301,6 @@ int main(int argc, char* argv[]) {
         struct Matrix* W = transformToW(A);
         
         tab_size = W->rows;
-        nbr_tab = tab_size / nbr_procs;
         
         W_row = allocateMatrix(tab_size, nbr_tab);
         W_column = allocateMatrix(tab_size, nbr_tab);
@@ -366,7 +367,7 @@ int main(int argc, char* argv[]) {
         result = allocateMatrix(tab_size, nbr_tab);
         
         // Envoie de la taille de la matrice au processus suivant si le prochain n'est pas 0
-        if (rank != nbr_procs - 1) {
+        if (next != 0) {
             MPI_Send(&tab_size, 1, MPI_INT, next, TAG_SIZES, MPI_COMM_WORLD);
             MPI_Send(&nbr_tab, 1, MPI_INT, next, TAG_SIZES, MPI_COMM_WORLD);
         }
