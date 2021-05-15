@@ -51,7 +51,7 @@ void printMatrix(struct Matrix *matrix) {
 }
 
 /**
- * Permet d'allouer correctement une matrice
+ * Permet d'allouer  une matrice de taille quelconque
  */
 struct Matrix* allocateMatrix(int columns, int rows) {
     struct Matrix *tmp = malloc(sizeof(struct Matrix));
@@ -68,9 +68,8 @@ struct Matrix* allocateMatrix(int columns, int rows) {
     return tmp;
 }
 
-
 /**
- * Permet de free une matrice
+ * Permet de free la mémoire d'une matrice
  */
 void freeMatrix(struct Matrix *matrix) {
     #pragma omp parallel for
@@ -100,7 +99,7 @@ struct Matrix* transpose(struct Matrix* matrix) {
 }
 
 /**
- * Effectue le produit matriciel entre une ligne et une colonne et stocke le résultat dans le bon indice de la matrice 'result'
+ * Effectue le produit matriciel entre une ligne et une colonne et stocke le résultat au bon indice de la matrice 'result'
  */
 void product(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* result, int nbr_tab, int startX) {
     int i = 0;
@@ -118,7 +117,7 @@ void product(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* resul
 }
 
 /**
- * Applique l'alogorithme de Floyd-Marshall entre une ligne et une colonne et stocke le résultat dans le bon indice de la matrice 'result'
+ * Applique l'alogorithme de Floyd-Marshall entre une ligne et une colonne et stocke le résultat au bon indice de la matrice 'result'
  */
 void floyd(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* result, int nbr_tab, int startX) {
     int i = 0;
@@ -156,7 +155,7 @@ struct Matrix* parseFileAndFillMatrix(char* filePath) {
         }
     }
             
-    struct Matrix* matrix = allocateMatrix(size, size); // Parce que nous sommes dans le cas des matrices carrées
+    struct Matrix* matrix = allocateMatrix(size, size); // Le fichier en entrée décrit une matrice carrée
     
     // Retour au début du fichier
     rewind(file);
