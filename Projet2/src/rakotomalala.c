@@ -227,7 +227,7 @@ void scatter(struct Matrix* matrix, int previous, int next, int nbr_tab, int tab
 /**
  * Permet à un processus d'envoyer la matrice résultat à son prédécesseur, et de recevoir du suivant les matrices résultats
  */
-void gather(struct Matrix* result, int previous, int next, int nbr_tab, int tab_size, int nbr_procs_used, int rank) {
+void gather(struct Matrix* result, int previous, int next, int nbr_tab, int tab_size, int rank) {
     MPI_Status status;
     
     for (int y = nbr_tab - 1; y >= 0; y--) {
@@ -399,7 +399,7 @@ int main(int argc, char* argv[]) {
         }
 
         // Récupération des résultats des suivants et envoie des résultats au précédent
-        gather(result, previous, next, nbr_tab, tab_size, nbr_procs_used, rank);
+        gather(result, previous, next, nbr_tab, tab_size, rank);
         
         freeMatrix(W_row);
         freeMatrix(W_column);
