@@ -230,15 +230,15 @@ void scatter(struct Matrix* matrix, int previous, int next, int nbr_tab, int tab
 void gather(struct Matrix* result, int previous, int next, int nbr_tab, int tab_size, int nbr_procs_used, int rank) {
     MPI_Status status;
     
-    for (int y = 0; y < nbr_tab; y++) {
-        MPI_Send(result->data[y], tab_size, MPI_INT, previous, TAG_GATHER, MPI_COMM_WORLD);
+    for (int y = nbr_tab - 1; y >= 0; y--) {
+        MPI_Send(result->data[y], tab_size, MPI_INT, next, TAG_GATHER, MPI_COMM_WORLD);
     }
     
     int tmp[tab_size];
-    for (int i = rank; i < nbr_procs_used - 1; i++) {
+    for (int i = 0; i < rank - 1; i++) {
         for (int y = 0; y < nbr_tab; y++) {
-            MPI_Recv(&tmp, tab_size, MPI_INT, next, TAG_GATHER, MPI_COMM_WORLD, &status);
-            MPI_Send(&tmp, tab_size, MPI_INT, previous, TAG_GATHER, MPI_COMM_WORLD);
+            MPI_Recv(&tmp, tab_size, MPI_INT, previous, TAG_GATHER, MPI_COMM_WORLD, &status);
+            MPI_Send(&tmp, tab_size, MPI_INT, next, TAG_GATHER, MPI_COMM_WORLD);
         }
     }
 }
@@ -246,12 +246,12 @@ void gather(struct Matrix* result, int previous, int next, int nbr_tab, int tab_
 /**
  * Permet à P0 de récupérer toutes les lignes et des les placer au bon endroit dans sa matrice
  */
-void gatherFinal(struct Matrix* result, int next, int nbr_tab, int tab_size, int nbr_procs_used) {
+void gatherFinal(struct Matrix* result, int previous, int nbr_tab, int tab_size, int nbr_procs_used) {
     MPI_Status status;
     
-    for (int i = 0; i < nbr_procs_used - 1; i++) {
+    for (int i = nbr_procs_used - 1; i > 0 ; i--) {
         for (int j = 0; j < nbr_tab; j++) {
-            MPI_Recv(result->data[nbr_tab + (nbr_tab * i) + j], tab_size, MPI_INT, next, TAG_GATHER, MPI_COMM_WORLD, &status);
+            MPI_Recv(result->data[nbr_tab + (nbr_tab * i) - j - 1], tab_size, MPI_INT, previous, TAG_GATHER, MPI_COMM_WORLD, &status);
         }
     }
 }
@@ -282,8 +282,8 @@ int main(int argc, char* argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &nbr_procs);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     
-    int previous = ((rank - 1 + nbr_procs) % nbr_procs); // TODO: Maybe change with 'nbr_procs_used' when necessary ?
-    int next = ((rank + 1) % nbr_procs); // TODO: Maybe change with 'nbr_procs_used' when necessary ?
+    int previous = ((rank - 1 + nbr_procs) % nbr_procs);
+    int next = ((rank + 1) % nbr_procs);
     
     int tab_size;
     int nbr_tab;
@@ -296,6 +296,7 @@ int main(int argc, char* argv[]) {
     if (rank == 0) {
         // Parse du fichier
         struct Matrix* A = parseFileAndFillMatrix(argv[1]);
+        
         // Transformation de la matrice A en matrice adjacente W
         struct Matrix* W = transformToW(A);
         
@@ -332,7 +333,9 @@ int main(int argc, char* argv[]) {
 
         for (int n = 0; n < tab_size - 1; n++) { // Matrice à la puissance N
             if (n != 0) {
+                #pragma omp parallel for
                 for (int y = 0; y < nbr_tab; y++) {
+                    #pragma omp parallel for
                     for (int x = 0; x < tab_size; x++)
                         W_row->data[y][x] = result->data[y][x];
                 }
@@ -344,7 +347,7 @@ int main(int argc, char* argv[]) {
         }
         
         // Récupération de tous les résultats
-        gatherFinal(result, next, nbr_tab, tab_size, nbr_procs_used);
+        gatherFinal(result, previous, nbr_tab, tab_size, nbr_procs_used);
 
         // Affichage du résultat final
         printMatrix(result);
@@ -381,7 +384,9 @@ int main(int argc, char* argv[]) {
         
         for (int n = 0; n < tab_size - 1; n++) { // Matrice à la puissance N
             if (n != 0) {
+                #pragma omp parallel for
                 for (int y = 0; y < nbr_tab; y++) {
+                    #pragma omp parallel for
                     for (int x = 0; x < tab_size; x++)
                         W_row->data[y][x] = result->data[y][x];
                 }
