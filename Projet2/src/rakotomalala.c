@@ -270,7 +270,7 @@ void gather(struct Matrix* result, int previous, int next, int nbr_tab, int tab_
  * @param tab_size : le nombre d'éléments par ligne
  * @param nbr_procs_used : le nombre de processeurs utilisés rééllement par le programme
  * @return void
-  */
+ */
 void gatherFinal(struct Matrix* result, int previous, int nbr_tab, int tab_size, int nbr_procs_used) {
     MPI_Status status;
     
@@ -282,7 +282,7 @@ void gatherFinal(struct Matrix* result, int previous, int nbr_tab, int tab_size,
 }
 
 /**
- * Envoie une matrice  au suivant et reçoit une matrice de son prédécesseur
+ * Envoie une matrice au successeur et reçoit une matrice de son prédécesseur
  * @param W_column : la matrice à envoyer/recevoir
  * @param nbr_tab : le nombre de ligne de la matrice
  * @param tab_size : le nombre d'éléments par ligne
