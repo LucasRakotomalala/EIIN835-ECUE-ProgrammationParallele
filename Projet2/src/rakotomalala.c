@@ -1,8 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <mpi.h>
-#include <omp.h>
+#include <mpi.h> // MPI
+#include <omp.h> // #pragma
 
+// Définitions de macros utilisées tout au long du projet
 #define INF -1
 
 #define TAG_SIZES 11
@@ -21,7 +22,7 @@ int min(int a, int b) {
         return a < b ? a : b;
 }
 
-int add(int a, int b) {
+int sum(int a, int b) {
     if (a < 0 || b < 0)
         return -1;
     else
@@ -35,9 +36,6 @@ struct Matrix {
     int rows;
 };
 
-/**
- * Affiche une matrice sur la sortie standard
- */
 void printMatrix(struct Matrix *matrix) {
     for (int y = 0; y < matrix->rows; y++) {
         for (int x = 0; x < matrix->columns; x++) {
@@ -50,9 +48,6 @@ void printMatrix(struct Matrix *matrix) {
     }
 }
 
-/**
- * Permet d'allouer  une matrice de taille quelconque
- */
 struct Matrix* allocateMatrix(int columns, int rows) {
     struct Matrix *tmp = malloc(sizeof(struct Matrix));
     
@@ -68,9 +63,6 @@ struct Matrix* allocateMatrix(int columns, int rows) {
     return tmp;
 }
 
-/**
- * Permet de free la mémoire d'une matrice
- */
 void freeMatrix(struct Matrix *matrix) {
     #pragma omp parallel for
     for (int i = 0; i < matrix->rows; i++) {
@@ -83,6 +75,8 @@ void freeMatrix(struct Matrix *matrix) {
 
 /**
  * Calcule la transposée de la matrice passée en paramètre
+ * @param matrix  : matrice dont on calcule la transposée
+ * @return la transposée de "matrix"
  */
 struct Matrix* transpose(struct Matrix* matrix) {
     struct Matrix *transpose = allocateMatrix(matrix->rows, matrix->columns);
@@ -99,25 +93,13 @@ struct Matrix* transpose(struct Matrix* matrix) {
 }
 
 /**
- * Effectue le produit matriciel entre une ligne et une colonne et stocke le résultat au bon indice de la matrice 'result'
- */
-void product(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* result, int nbr_tab, int startX) {
-    int i = 0;
-    for (int z = startX; z < (nbr_tab + startX); z++) {
-        #pragma omp parallel for
-        for (int y = 0; y < nbr_tab; y++) {
-            result->data[y][z] = 0;
-            #pragma omp parallel for
-            for (int x = 0; x < W_row->columns; x++) {
-                result->data[y][z] += (W_row->data[y][x] * W_column->data[i][x]);
-            }
-        }
-        i++;
-    }
-}
-
-/**
- * Applique l'alogorithme de Floyd-Marshall entre une ligne et une colonne et stocke le résultat au bon indice de la matrice 'result'
+ * Applique l'algorithme de Floyd-Marshall entre une ligne et une colonne (voire plus) et stocke le résultat au bon indice de la matrice "result"
+ * @param W_row :
+ * @param W_column :
+ * @param result :
+ * @param nbr_tab :
+ * @param startX :
+ * @return void
  */
 void floyd(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* result, int nbr_tab, int startX) {
     int i = 0;
@@ -127,7 +109,7 @@ void floyd(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* result,
             result->data[y][z] = INF;
             #pragma omp parallel for
             for (int x = 0; x < W_row->columns; x++) {
-                result->data[y][z] = min(result->data[y][z], (add(W_row->data[y][x], W_column->data[i][x])));
+                result->data[y][z] = min(result->data[y][z], (sum(W_row->data[y][x], W_column->data[i][x])));
             }
         }
         i++;
@@ -135,7 +117,9 @@ void floyd(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* result,
 }
 
 /**
- * Lecture du fichier pour construire la matrice
+ * Ouverture d'un fichier et lecture de celui-ci pour construire la matrice A
+ * @param filePath : le chemin du fichier à ouvrir et lire
+ * @return la matrice du fichier
  */
 struct Matrix* parseFileAndFillMatrix(char* filePath) {
     FILE* file;
@@ -155,7 +139,7 @@ struct Matrix* parseFileAndFillMatrix(char* filePath) {
         }
     }
             
-    struct Matrix* matrix = allocateMatrix(size, size); // Le fichier en entrée décrit une matrice carrée
+    struct Matrix* matrix = allocateMatrix(size, size); // Le fichier d'entrée décrit une matrice carrée
     
     // Retour au début du fichier
     rewind(file);
@@ -175,7 +159,9 @@ struct Matrix* parseFileAndFillMatrix(char* filePath) {
 }
 
 /**
- * Transforme la matrice lu en matrice adjacente W
+ * Construit la matrice adjacente W de celle passée en paramètre
+ * @param A : la matrice dont on doit construire sa matrice adjacente
+ * @return la matrice adjacente de celle passée en paramètre
  */
 struct Matrix* transformToW(struct Matrix* A) {
     struct Matrix *W = allocateMatrix(A->columns, A->rows);
@@ -197,7 +183,12 @@ struct Matrix* transformToW(struct Matrix* A) {
 }
 
 /**
- * Permet à P0 d'envoyer un bout de matricesà P1
+ * Permet à P0 d'envoyer un bout de matrà P1
+ * @param W : la matrice à "scatteriser"
+ * @param tab_size : la taille
+ * @param startY :
+ * @param endY:
+ * @return void
  */
 void scatterInit(struct Matrix* W, int tab_size, int startY, int endY, int next, int tag) {
     for (int y = startY; y < endY; y++) {
@@ -207,6 +198,7 @@ void scatterInit(struct Matrix* W, int tab_size, int startY, int endY, int next,
 
 /**
  * Permet à un processus de recevoir un bout de matrice de son prédécesseur, de récupérer le bout qui l'intéresse et d'envoyer le reste au suivant
+ * @return void
  */
 void scatter(struct Matrix* matrix, int previous, int next, int nbr_tab, int tab_size, int nbr_procs_used, int rank, int tag) {
     MPI_Status status;
@@ -226,6 +218,7 @@ void scatter(struct Matrix* matrix, int previous, int next, int nbr_tab, int tab
 
 /**
  * Permet à un processus d'envoyer la matrice résultat à son prédécesseur, et de recevoir du suivant les matrices résultats
+ * @return void
  */
 void gather(struct Matrix* result, int previous, int next, int nbr_tab, int tab_size, int rank) {
     MPI_Status status;
@@ -245,6 +238,7 @@ void gather(struct Matrix* result, int previous, int next, int nbr_tab, int tab_
 
 /**
  * Permet à P0 de récupérer toutes les lignes et des les placer au bon endroit dans sa matrice
+ * @return void
  */
 void gatherFinal(struct Matrix* result, int previous, int nbr_tab, int tab_size, int nbr_procs_used) {
     MPI_Status status;
@@ -257,7 +251,13 @@ void gatherFinal(struct Matrix* result, int previous, int nbr_tab, int tab_size,
 }
 
 /**
- * Envoie une matrice au suivant et reçoit une matrice de son prédécesseur
+ * Envoie une matrice  au suivant et reçoit une matrice de son prédécesseur
+ * @param W_column : la matrice à envoyer/recevoir
+ * @param nbr_tab : le nombre de ligne de la matrice
+ * @param tab_size : le nombre d'éléments par ligne
+ * @param previous : le prédeccesseur du processeur actuel
+ * @param next : le suivant du processeur actuel
+ * @return void
  */
 void circulate(struct Matrix* W_column, int nbr_tab, int tab_size, int next, int previous) {
     MPI_Status status;
