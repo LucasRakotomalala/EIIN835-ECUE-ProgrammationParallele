@@ -94,11 +94,11 @@ struct Matrix* transpose(struct Matrix* matrix) {
 
 /**
  * Applique l'algorithme de Floyd-Marshall entre une ligne et une colonne (voire plus) et stocke le résultat au bon indice de la matrice "result"
- * @param W_row :
- * @param W_column :
- * @param result :
- * @param nbr_tab :
- * @param startX :
+ * @param W_row : la matrice colonne possiblement élevée une puissance quelconque
+ * @param W_column : la matrice colonne utilisée pour finalement élever "W_row" à la puissance N
+ * @param result : la matrice dans laquelle on va stocker les résultat
+ * @param nbr_tab : le nombre de ligne de la matrice
+ * @param startX : l'indice à partir duquel on commence l'algorithme pour stocker au bon endroit le résultat
  * @return void
  */
 void floyd(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* result, int nbr_tab, int startX) {
@@ -183,41 +183,67 @@ struct Matrix* transformToW(struct Matrix* A) {
 }
 
 /**
- * Permet à P0 d'envoyer un bout de matrà P1
- * @param W : la matrice à "scatteriser"
- * @param tab_size : la taille
- * @param startY :
- * @param endY:
+ * Permet à un processeur de recevoir de son prédécesseur et d'envoyer à son successeur un entier (si le successeur n'est pas 0)
+ * @param value_to_broadcast : le pointeur de la valeur que le souhaite envoyer/récupérer
+ * @param rank : le rang du processeur qui appelle la méthode
+ * @param previous : le successeur du processeur actuel
+ * @param next : le suivant du processeur actuel
  * @return void
  */
-void scatterInit(struct Matrix* W, int tab_size, int startY, int endY, int next, int tag) {
-    for (int y = startY; y < endY; y++) {
-        MPI_Send(W->data[y], tab_size, MPI_INT, next, tag, MPI_COMM_WORLD);
-    }
+void broadcast(int* value_to_broadcast, int rank, int previous, int next) {
+    MPI_Status status;
+
+    if (rank != 0)
+        MPI_Recv(value_to_broadcast, 1, MPI_INT, previous, TAG_SIZES, MPI_COMM_WORLD, &status);
+    if (next != 0)
+        MPI_Send(value_to_broadcast, 1, MPI_INT, next, TAG_SIZES, MPI_COMM_WORLD);
 }
 
 /**
- * Permet à un processus de recevoir un bout de matrice de son prédécesseur, de récupérer le bout qui l'intéresse et d'envoyer le reste au suivant
+ * Permet à un processeur de recevoir un bout de matrice de son prédécesseur, de récupérer le bout qui l'intéresse et d'envoyer le reste au suivant
+ * @param matrix : la matrice dans laquelle on stocke certaines données
+ * @param previous : le prédécesseur du processeur actuel
+ * @param next : le successeur du processeur actuel
+ * @param nbr_tab : le nombre de ligne de la matrice
+ * @param tab_size : le nombre d'éléments par ligne
+ * @param nbr_procs_used : le nombre de processeurs utilisés rééllement par le programme
+ * @param rank : le rang du processeur qui appelle la méthode
+ * @param tag : le tag MPI sur lequel on souhaite envoyer/récupérer les données
  * @return void
  */
 void scatter(struct Matrix* matrix, int previous, int next, int nbr_tab, int tab_size, int nbr_procs_used, int rank, int tag) {
-    MPI_Status status;
-    
-    for (int y = 0; y < nbr_tab; y++) {
-        MPI_Recv(matrix->data[y], tab_size, MPI_INT, previous, tag, MPI_COMM_WORLD, &status);
-    }
-    
-    int tmp[tab_size];
-    for (int i = rank; i < nbr_procs_used - 1; i++) {
+    if (rank == 0) {
+        for (int i = 1; i < nbr_procs_used; i++) {
+            for (int y = (i * nbr_tab); y < ((i * nbr_tab) + nbr_tab); y++) {
+                MPI_Send(matrix->data[y], tab_size, MPI_INT, next, tag, MPI_COMM_WORLD);
+            }
+        }
+    } else {
+        MPI_Status status;
+        
         for (int y = 0; y < nbr_tab; y++) {
-            MPI_Recv(&tmp, tab_size, MPI_INT, previous, tag, MPI_COMM_WORLD, &status);
-            MPI_Send(&tmp, tab_size, MPI_INT, next, tag, MPI_COMM_WORLD);
+            MPI_Recv(matrix->data[y], tab_size, MPI_INT, previous, tag, MPI_COMM_WORLD, &status);
+        }
+        
+        int tmp[tab_size];
+        for (int i = rank; i < nbr_procs_used - 1; i++) {
+            for (int y = 0; y < nbr_tab; y++) {
+                MPI_Recv(&tmp, tab_size, MPI_INT, previous, tag, MPI_COMM_WORLD, &status);
+                MPI_Send(&tmp, tab_size, MPI_INT, next, tag, MPI_COMM_WORLD);
+            }
         }
     }
 }
 
 /**
- * Permet à un processus d'envoyer la matrice résultat à son prédécesseur, et de recevoir du suivant les matrices résultats
+ * Permet à un processeur (autre que P0) d'envoyer la matrice résultat à son successeur, et de recevoir du prédécesseur la matrice "résultat"
+ * @param result : la matrice dans laquelle il y a les résultats de la matrice W élevée à la puissance N
+ * @param previous : le prédécesseur du processeur actuel
+ * @param next : le successeur du processeur actuel
+ * @param nbr_tab : le nombre de ligne de la matrice
+ * @param tab_size : le nombre d'éléments par ligne
+ * @param nbr_procs_used : le nombre de processeurs utilisés rééllement par le programme
+ * @param rank : le rang du processeur qui appelle la méthode
  * @return void
  */
 void gather(struct Matrix* result, int previous, int next, int nbr_tab, int tab_size, int rank) {
@@ -238,8 +264,13 @@ void gather(struct Matrix* result, int previous, int next, int nbr_tab, int tab_
 
 /**
  * Permet à P0 de récupérer toutes les lignes et des les placer au bon endroit dans sa matrice
+ * @param result : la matrice dans laquelle on va stocker le résultat des matrices résultats des autres processeurs
+ * @param previous : le prédécesseur du processeur actuel
+ * @param nbr_tab : le nombre de ligne de la matrice
+ * @param tab_size : le nombre d'éléments par ligne
+ * @param nbr_procs_used : le nombre de processeurs utilisés rééllement par le programme
  * @return void
- */
+  */
 void gatherFinal(struct Matrix* result, int previous, int nbr_tab, int tab_size, int nbr_procs_used) {
     MPI_Status status;
     
@@ -256,7 +287,7 @@ void gatherFinal(struct Matrix* result, int previous, int nbr_tab, int tab_size,
  * @param nbr_tab : le nombre de ligne de la matrice
  * @param tab_size : le nombre d'éléments par ligne
  * @param previous : le prédeccesseur du processeur actuel
- * @param next : le suivant du processeur actuel
+ * @param next : le successeur du processeur actuel
  * @return void
  */
 void circulate(struct Matrix* W_column, int nbr_tab, int tab_size, int next, int previous) {
@@ -300,11 +331,8 @@ int main(int argc, char* argv[]) {
         // Transformation de la matrice A en matrice adjacente W
         struct Matrix* W = transformToW(A);
         
+        // Définition des variables
         tab_size = W->rows;
-        
-        W_row = allocateMatrix(tab_size, nbr_tab);
-        W_column = allocateMatrix(tab_size, nbr_tab);
-        result = allocateMatrix(tab_size, tab_size);
         
         if ((tab_size / nbr_procs) < 1) {
             nbr_tab = 1;
@@ -313,25 +341,29 @@ int main(int argc, char* argv[]) {
             nbr_tab = (int) (tab_size / nbr_procs);
             nbr_procs_used = nbr_procs;
         }
-                
-        // Envoie de la taille de la matrice à P1
-        if (nbr_procs_used > 1) {
-            MPI_Send(&tab_size, 1, MPI_INT, next, TAG_SIZES, MPI_COMM_WORLD);
-            MPI_Send(&nbr_tab, 1, MPI_INT, next, TAG_SIZES, MPI_COMM_WORLD);
-        }
         
+        // Allocation mémoire des matrices
+        W_row = allocateMatrix(tab_size, nbr_tab);
+        W_column = allocateMatrix(tab_size, nbr_tab);
+        result = allocateMatrix(tab_size, tab_size);
+        
+        // Broadcast sur anneau du nombre de ligne(s)/colonne(s) à traiter par chaque processeur et de la taille d'une ligne/colonne
+        broadcast(&tab_size, rank, previous, next);
+        broadcast(&nbr_tab, rank, previous, next);
+        
+        // Création des matrices lignes et colonnes sur lesquelles on va travailler pour éviter d'utiliser la matrice W
+        #pragma omp parallel for
         for (int i = 0; i < nbr_tab; i++) {
             W_row->data[i] = W->data[i];
             W_column->data[i] = transpose(W)->data[i];
         }
             
         // Scatter W en lignes et en colonnes
-        for (int i = 1; i < nbr_procs_used; i++) {
-            scatterInit(W, tab_size, (i * nbr_tab), ((i * nbr_tab) + nbr_tab), next, TAG_SCATTER_ROWS);
-            scatterInit(transpose(W), tab_size, (i * nbr_tab), ((i * nbr_tab) + nbr_tab), next, TAG_SCATTER_COLUMNS);
-        }
+        scatter(W, previous, next, nbr_tab, tab_size, nbr_procs_used, rank, TAG_SCATTER_ROWS);
+        scatter(transpose(W), previous, next, nbr_tab, tab_size, nbr_procs_used, rank, TAG_SCATTER_COLUMNS);
 
-        for (int n = 0; n < tab_size - 1; n++) { // Matrice à la puissance N
+        // On élève la matrice ligne (W_row) à la puissance N
+        for (int n = 0; n < tab_size - 1; n++) {
             if (n != 0) {
                 #pragma omp parallel for
                 for (int y = 0; y < nbr_tab; y++) {
@@ -357,32 +389,29 @@ int main(int argc, char* argv[]) {
         freeMatrix(W_column);
         freeMatrix(result);
     } else {
-        MPI_Status status;
+        // Broadcast sur anneau du nombre de ligne(s)/colonne(s) à traiter par chaque processeur et de la taille d'une ligne/colonne
+        broadcast(&tab_size, rank, previous, next);
+        broadcast(&nbr_tab, rank, previous, next);
+        
+        // Définition des variables
+        if ((tab_size / nbr_procs) < 1) {
+            nbr_procs_used = tab_size;
+        }
+        else {
+            nbr_procs_used = nbr_procs;
+        }
 
-        // Réception de la taille de la matrice du processus précedents
-        MPI_Recv(&tab_size, 1, MPI_INT, previous, TAG_SIZES, MPI_COMM_WORLD, &status);
-        MPI_Recv(&nbr_tab, 1, MPI_INT, previous, TAG_SIZES, MPI_COMM_WORLD, &status);
-                
         // Allocation des matrices
         W_row = allocateMatrix(tab_size, nbr_tab);
         W_column = allocateMatrix(tab_size, nbr_tab);
         result = allocateMatrix(tab_size, nbr_tab);
         
-        // Envoie de la taille de la matrice au processus suivant si le prochain n'est pas 0
-        if (next != 0) {
-            MPI_Send(&tab_size, 1, MPI_INT, next, TAG_SIZES, MPI_COMM_WORLD);
-            MPI_Send(&nbr_tab, 1, MPI_INT, next, TAG_SIZES, MPI_COMM_WORLD);
-        }
-        
-        if ((tab_size / nbr_procs) < 1)
-            nbr_procs_used = tab_size;
-        else
-            nbr_procs_used = nbr_procs;
-        
+        // Scatter W_row et W_column
         scatter(W_row, previous, next, nbr_tab, tab_size, nbr_procs_used, rank, TAG_SCATTER_ROWS);
         scatter(W_column, previous, next, nbr_tab, tab_size, nbr_procs_used, rank, TAG_SCATTER_COLUMNS);
         
-        for (int n = 0; n < tab_size - 1; n++) { // Matrice à la puissance N
+        // On élève la matrice ligne (W_row) à la puissance N
+        for (int n = 0; n < tab_size - 1; n++) {
             if (n != 0) {
                 #pragma omp parallel for
                 for (int y = 0; y < nbr_tab; y++) {
@@ -392,8 +421,7 @@ int main(int argc, char* argv[]) {
                 }
             }
             for (int i = nbr_procs_used; i > 0; i--) {
-                int startX = ((nbr_tab * (i + rank)) % tab_size);
-                floyd(W_row, W_column, result, nbr_tab, startX);
+                floyd(W_row, W_column, result, nbr_tab, ((nbr_tab * (i + rank)) % tab_size));
                 circulate(W_column, nbr_tab, tab_size, next, previous);
             }
         }
