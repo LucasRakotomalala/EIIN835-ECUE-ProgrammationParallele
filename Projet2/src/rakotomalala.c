@@ -208,7 +208,7 @@ void broadcast(int* value_to_broadcast, int rank, int previous, int next) {
  * @param tab_size : le nombre d'éléments par ligne
  * @param nbr_procs_used : le nombre de processeurs utilisés rééllement par le programme
  * @param rank : le rang du processeur qui appelle la méthode
- * @param tag : le tag MPI sur lequel on souhaite envoyer/récupérer les données
+ * @param tag : le tag MPI sur lequel on souhaite envoyer / récupérer les données
  * @return void
  */
 void scatter(struct Matrix* matrix, int previous, int next, int nbr_tab, int tab_size, int nbr_procs_used, int rank, int tag) {
@@ -236,8 +236,8 @@ void scatter(struct Matrix* matrix, int previous, int next, int nbr_tab, int tab
 }
 
 /**
- * Permet à un processeur (autre que P0) d'envoyer la matrice résultat à son successeur, et de recevoir du prédécesseur la matrice "résultat"
- * @param result : la matrice dans laquelle il y a les résultats de la matrice W élevée à la puissance N
+ * Permet à un processeur (autre que P0) d'envoyer la matrice résultat à son successeur, et de recevoir du prédécesseur la matrice "result"
+ * @param result : la matrice dans laquelle il y a les résultats de la matrice "W" élevée à la puissance N
  * @param previous : le prédécesseur du processeur actuel
  * @param next : le successeur du processeur actuel
  * @param nbr_tab : le nombre de ligne de la matrice
@@ -283,7 +283,7 @@ void gatherFinal(struct Matrix* result, int previous, int nbr_tab, int tab_size,
 
 /**
  * Envoie une matrice au successeur et reçoit une matrice de son prédécesseur
- * @param W_column : la matrice à envoyer/recevoir
+ * @param W_column : la matrice à envoyer / recevoir
  * @param nbr_tab : le nombre de ligne de la matrice
  * @param tab_size : le nombre d'éléments par ligne
  * @param previous : le prédécesseur du processeur actuel
@@ -302,7 +302,7 @@ void circulate(struct Matrix* W_column, int nbr_tab, int tab_size, int next, int
 /**
  * Élève la matrice "W_row" à la puissance N (avec N la taille d'une ligne de la matrice) grâce à la matrice colonne "W_column" qui circule entre tous les processeurs
  * @param W_row : la matrice à élever à la puissance N
- * @param W_column : la matrice à envoyer/recevoir utilisée pour élever "W_row" à la puissance N
+ * @param W_column : la matrice à envoyer / recevoir utilisée pour élever "W_row" à la puissance N
  * @param result : la matrice dans laquelle on va stocker les résultats
  * @param nbr_tab : le nombre de ligne de la matrice
  * @param tab_size : le nombre d'éléments par ligne
@@ -380,7 +380,7 @@ int main(int argc, char* argv[]) {
         W_column = allocateMatrix(tab_size, nbr_tab);
         result = allocateMatrix(tab_size, tab_size);
         
-        // Broadcast sur anneau du nombre de ligne(s) / colonne(s) à traiter par chaque processeur et de la taille d'une ligne/colonne
+        // Broadcast sur anneau du nombre de ligne(s) / colonne(s) à traiter par chaque processeur et de la taille d'une ligne / colonne
         broadcast(&tab_size, rank, previous, next);
         broadcast(&nbr_tab, rank, previous, next);
         
@@ -409,7 +409,7 @@ int main(int argc, char* argv[]) {
         freeMatrix(W_column);
         freeMatrix(result);
     } else {
-        // Broadcast sur anneau du nombre de ligne(s)/colonne(s) à traiter par chaque processeur et de la taille d'une ligne/colonne
+        // Broadcast sur anneau du nombre de ligne(s) / colonne(s) à traiter par chaque processeur et de la taille d'une ligne / colonne
         broadcast(&tab_size, rank, previous, next);
         broadcast(&nbr_tab, rank, previous, next);
         
@@ -430,7 +430,7 @@ int main(int argc, char* argv[]) {
         scatter(W_row, previous, next, nbr_tab, tab_size, nbr_procs_used, rank, TAG_SCATTER_ROWS);
         scatter(W_column, previous, next, nbr_tab, tab_size, nbr_procs_used, rank, TAG_SCATTER_COLUMNS);
         
-        // On élève la matrice ligne (W_row) à la puissance N
+        // On élève la matrice ligne (à savoir "W_row") à la puissance N
         elevateToN(W_row, W_column, result, nbr_tab, tab_size, next, previous, nbr_procs_used, rank);
 
         // Récupération des résultats des suivants et envoie des résultats au précédent
