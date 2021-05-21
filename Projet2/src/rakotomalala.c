@@ -96,14 +96,14 @@ struct Matrix* transpose(struct Matrix* matrix) {
  * Applique l'algorithme de Floyd-Marshall entre une ligne et une colonne (voire plus) et stocke le résultat au bon indice de la matrice "result"
  * @param W_row : la matrice colonne possiblement élevée une puissance quelconque
  * @param W_column : la matrice colonne utilisée pour finalement élever "W_row" à la puissance N
- * @param result : la matrice dans laquelle on va stocker les résultat
+ * @param result : la matrice dans laquelle on va stocker les résultats
  * @param nbr_tab : le nombre de ligne de la matrice
- * @param startX : l'indice à partir duquel on commence l'algorithme pour stocker au bon endroit le résultat
+ * @param startZ : l'indice à partir duquel on commence l'algorithme pour stocker au bon endroit le résultat
  * @return void
  */
-void floyd(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* result, int nbr_tab, int startX) {
+void floyd(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* result, int nbr_tab, int startZ) {
     int i = 0;
-    for (int z = startX; z < (nbr_tab + startX); z++) {
+    for (int z = startZ; z < (nbr_tab + startZ); z++) {
         #pragma omp parallel for
         for (int y = 0; y < nbr_tab; y++) {
             result->data[y][z] = INF;
@@ -286,7 +286,7 @@ void gatherFinal(struct Matrix* result, int previous, int nbr_tab, int tab_size,
  * @param W_column : la matrice à envoyer/recevoir
  * @param nbr_tab : le nombre de ligne de la matrice
  * @param tab_size : le nombre d'éléments par ligne
- * @param previous : le prédeccesseur du processeur actuel
+ * @param previous : le prédécesseur du processeur actuel
  * @param next : le successeur du processeur actuel
  * @return void
  */
@@ -296,6 +296,39 @@ void circulate(struct Matrix* W_column, int nbr_tab, int tab_size, int next, int
     for (int i = 0; i < nbr_tab; i++) {
         MPI_Send(W_column->data[i], tab_size, MPI_INT, next, TAG_CIRCULATE, MPI_COMM_WORLD);
         MPI_Recv(W_column->data[i], tab_size, MPI_INT, previous, TAG_CIRCULATE, MPI_COMM_WORLD, &status);
+    }
+}
+
+/**
+ * Élève la matrice "W_row" à la puissance N (avec N la taille d'une ligne de la matrice) grâce à la matrice colonne "W_column" qui circule entre tous les processeurs
+ * @param W_row : la matrice à élever à la puissance N
+ * @param W_column : la matrice à envoyer/recevoir utilisée pour élever "W_row" à la puissance N
+ * @param result : la matrice dans laquelle on va stocker les résultats
+ * @param nbr_tab : le nombre de ligne de la matrice
+ * @param tab_size : le nombre d'éléments par ligne
+ * @param previous : le prédécesseur du processeur actuel
+ * @param next : le successeur du processeur actuel
+ * @param nbr_procs_used : le nombre de processeurs utilisés rééllement par le programme
+ * @param rank : le rang du processeur qui appelle la méthode
+ * @return void
+ */
+void elevateToN(struct Matrix* W_row, struct Matrix* W_column, struct Matrix* result, int nbr_tab, int tab_size, int next, int previous, int nbr_procs_used, int rank) {
+    for (int n = 0; n < tab_size - 1; n++) {
+        if (n != 0) {
+            #pragma omp parallel for
+            for (int y = 0; y < nbr_tab; y++) {
+                #pragma omp parallel for
+                for (int x = 0; x < tab_size; x++)
+                    W_row->data[y][x] = result->data[y][x];
+            }
+        }
+        for (int i = nbr_procs_used; i > 0; i--) {
+            if (rank == 0)
+                floyd(W_row, W_column, result, nbr_tab, (nbr_tab * i) % tab_size);
+            else
+                floyd(W_row, W_column, result, nbr_tab, ((nbr_tab * (i + rank)) % tab_size));
+            circulate(W_column, nbr_tab, tab_size, next, previous);
+        }
     }
 }
 
@@ -347,7 +380,7 @@ int main(int argc, char* argv[]) {
         W_column = allocateMatrix(tab_size, nbr_tab);
         result = allocateMatrix(tab_size, tab_size);
         
-        // Broadcast sur anneau du nombre de ligne(s)/colonne(s) à traiter par chaque processeur et de la taille d'une ligne/colonne
+        // Broadcast sur anneau du nombre de ligne(s) / colonne(s) à traiter par chaque processeur et de la taille d'une ligne/colonne
         broadcast(&tab_size, rank, previous, next);
         broadcast(&nbr_tab, rank, previous, next);
         
@@ -363,20 +396,7 @@ int main(int argc, char* argv[]) {
         scatter(transpose(W), previous, next, nbr_tab, tab_size, nbr_procs_used, rank, TAG_SCATTER_COLUMNS);
 
         // On élève la matrice ligne (W_row) à la puissance N
-        for (int n = 0; n < tab_size - 1; n++) {
-            if (n != 0) {
-                #pragma omp parallel for
-                for (int y = 0; y < nbr_tab; y++) {
-                    #pragma omp parallel for
-                    for (int x = 0; x < tab_size; x++)
-                        W_row->data[y][x] = result->data[y][x];
-                }
-            }
-            for (int i = nbr_procs_used; i > 0; i--) {
-                floyd(W_row, W_column, result, nbr_tab, (nbr_tab * i) % tab_size);
-                circulate(W_column, nbr_tab, tab_size, next, previous);
-            }
-        }
+        elevateToN(W_row, W_column, result, nbr_tab, tab_size, next, previous, nbr_procs_used, rank);
         
         // Récupération de tous les résultats
         gatherFinal(result, previous, nbr_tab, tab_size, nbr_procs_used);
@@ -411,20 +431,7 @@ int main(int argc, char* argv[]) {
         scatter(W_column, previous, next, nbr_tab, tab_size, nbr_procs_used, rank, TAG_SCATTER_COLUMNS);
         
         // On élève la matrice ligne (W_row) à la puissance N
-        for (int n = 0; n < tab_size - 1; n++) {
-            if (n != 0) {
-                #pragma omp parallel for
-                for (int y = 0; y < nbr_tab; y++) {
-                    #pragma omp parallel for
-                    for (int x = 0; x < tab_size; x++)
-                        W_row->data[y][x] = result->data[y][x];
-                }
-            }
-            for (int i = nbr_procs_used; i > 0; i--) {
-                floyd(W_row, W_column, result, nbr_tab, ((nbr_tab * (i + rank)) % tab_size));
-                circulate(W_column, nbr_tab, tab_size, next, previous);
-            }
-        }
+        elevateToN(W_row, W_column, result, nbr_tab, tab_size, next, previous, nbr_procs_used, rank);
 
         // Récupération des résultats des suivants et envoie des résultats au précédent
         gather(result, previous, next, nbr_tab, tab_size, rank);
