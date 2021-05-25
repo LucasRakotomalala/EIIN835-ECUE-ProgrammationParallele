@@ -4,7 +4,7 @@
 #include <omp.h> // #pragma
 
 // Définitions de macros utilisées tout au long du projet
-#define INF -1
+#define INF 4294967295
 
 #define TAG_SIZES 11
 #define TAG_SCATTER_ROWS 12
@@ -13,25 +13,25 @@
 #define TAG_GATHER 15
 
 // Redéfinition du minimum et de l'addition pour l'algorithme de Floyd-Marshall
-int min(int a, int b) {
-    if (a < 0)
+unsigned int min(unsigned int a, unsigned int b) {
+    if (a == INF)
         return b;
-    else if (b < 0)
+    else if (b == INF)
         return a;
     else
         return a < b ? a : b;
 }
 
-int sum(int a, int b) {
-    if (a < 0 || b < 0)
-        return -1;
+unsigned int sum(unsigned int a, unsigned int b) {
+    if (a == INF || b == INF)
+        return INF;
     else
         return a + b;
 }
 
 // Structure utilisée pour le projet
 struct Matrix {
-    int** data;
+    unsigned int** data;
     int columns;
     int rows;
 };
@@ -42,7 +42,7 @@ void printMatrix(struct Matrix *matrix) {
             if (matrix->data[y][x] == INF)
                 printf("i ");
             else
-                printf("%d ", matrix->data[y][x]);
+                printf("%u ", matrix->data[y][x]);
         }
         printf("\n");
     }
@@ -53,11 +53,11 @@ struct Matrix* allocateMatrix(int columns, int rows) {
     
     tmp->columns = columns;
     tmp->rows = rows;
-    tmp->data = (int**) malloc(sizeof(int*) * rows);
+    tmp->data = (unsigned int**) malloc(sizeof(unsigned int*) * rows);
         
     #pragma omp parallel for
     for (int i = 0; i < rows; i++) {
-        tmp->data[i] = (int*) malloc(sizeof(int) * columns);
+        tmp->data[i] = (unsigned int*) malloc(sizeof(unsigned int) * columns);
     }
     
     return tmp;
@@ -131,7 +131,7 @@ struct Matrix* parseFileAndFillMatrix(char* filePath) {
     
     int size = 1;
     char c;
-    int nb;
+    unsigned int nb;
         
     for (c = fgetc(file); c != '\n'; c = fgetc(file)) {
         if (c == ' ') {
@@ -145,11 +145,11 @@ struct Matrix* parseFileAndFillMatrix(char* filePath) {
     rewind(file);
     
     // Remplissage de la matrice
-    fscanf(file, "%d", &nb);
+    fscanf(file, "%u", &nb);
       for (int y = 0; !feof(file); y++){
         for (int x = 0; x < size; x++) {
             matrix->data[y][x] = nb;
-            fscanf(file, "%d", &nb);
+            fscanf(file, "%u", &nb);
         }
       }
     
